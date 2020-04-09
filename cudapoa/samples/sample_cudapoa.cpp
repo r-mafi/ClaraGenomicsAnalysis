@@ -195,7 +195,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups, const int
 }
 
 void generate_short_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                          const int32_t number_of_windows = 1000, const int32_t sequence_size = 1024, const int32_t group_size = 100)
+                          const uint32_t number_of_windows = 1000, const uint32_t sequence_size = 1024, const uint32_t group_size = 100)
 {
     const std::string input_data = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-windows.txt";
     parse_window_data_file(windows, input_data, number_of_windows); // Generate windows.
@@ -204,7 +204,7 @@ void generate_short_reads(std::vector<std::vector<std::string>>& windows, BatchS
 }
 
 void generate_bonito_long_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                                const int32_t number_of_windows = 5, const int32_t sequence_size = 20000, const int32_t group_size = 6)
+                                const uint32_t number_of_windows = 5, const uint32_t sequence_size = 20000, const uint32_t group_size = 6)
 {
     const std::string input_data = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-bonito.txt";
     parse_window_data_file(windows, input_data, number_of_windows); // Generate windows.
@@ -224,31 +224,47 @@ void generate_bonito_long_reads(std::vector<std::vector<std::string>>& windows, 
     batch_size = BatchSize(max_read_length, group_size);
 }
 
-void generate_simulated_long_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                                   const int32_t number_of_windows = 2, const int32_t sequence_size = 10000, const int32_t group_size = 5)
+// the following function can create simulated reads in an arbitrary number of windows with given sequence length and POA group size
+void generate_simulated_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
+                              const uint32_t number_of_windows = 2, const uint32_t sequence_size = 10000, const uint32_t group_size = 5)
 {
     constexpr uint32_t random_seed = 5827349;
     std::minstd_rand rng(random_seed);
 
     int32_t max_sequence_length = sequence_size + 1;
 
+    // create variation_ranges used to generate some random variations in random positions
     std::vector<std::pair<int, int>> variation_ranges;
-    variation_ranges.push_back(std::pair<int, int>(30, 50));
-//    variation_ranges.push_back(std::pair<int, int>(300, 500));
-//    variation_ranges.push_back(std::pair<int, int>(1000, 1300));
-//    variation_ranges.push_back(std::pair<int, int>(2000, 2200));
-//    variation_ranges.push_back(std::pair<int, int>(3000, 3500));
-//    variation_ranges.push_back(std::pair<int, int>(4000, 4200));
-//    variation_ranges.push_back(std::pair<int, int>(5000, 5400));
-//    variation_ranges.push_back(std::pair<int, int>(6000, 6200));
-//    variation_ranges.push_back(std::pair<int, int>(8000, 8300));
+    uint32_t range_begin, range_end, range_width;
+    uint32_t max_range_width = sequence_size / 20;
+    uint32_t step_size       = 2 * max_range_width;
+    for (uint32_t start_idx = 0; start_idx < sequence_size; start_idx += step_size)
+    {
+        if (step_size == 0)
+        {
+            break;
+        }
+        std::uniform_int_distribution<uint32_t> random_pos(start_idx, start_idx + step_size);
+        range_begin = random_pos(rng);
+        std::uniform_int_distribution<uint32_t> random_width(0, max_range_width);
+        range_width = random_width(rng);
+        if ((range_begin + range_width) > (start_idx + step_size))
+        {
+            range_end   = start_idx + step_size;
+            range_begin = range_end - range_width;
+        }
+        else
+        {
+            range_end = range_begin + range_width;
+        }
+        variation_ranges.push_back(std::pair<int, int>(range_begin, range_end));
+    }
 
     std::vector<std::string> long_reads(group_size);
-
-    for (int w = 0; w < number_of_windows; w++)
+    for (uint32_t w = 0; w < number_of_windows; w++)
     {
         long_reads[0] = claragenomics::genomeutils::generate_random_genome(sequence_size, rng);
-        for (int i = 1; i < group_size; i++)
+        for (uint32_t i = 1; i < group_size; i++)
         {
             long_reads[i]       = claragenomics::genomeutils::generate_random_sequence(long_reads[0], rng, sequence_size, sequence_size, sequence_size, &variation_ranges);
             max_sequence_length = max_sequence_length > get_size(long_reads[i]) ? max_sequence_length : get_size(long_reads[i]) + 1;
@@ -258,7 +274,7 @@ void generate_simulated_long_reads(std::vector<std::vector<std::string>>& window
     }
 
     // Define upper limits for sequence size, graph size ....
-    batch_size = BatchSize(max_sequence_length, sequence_size);
+    batch_size = BatchSize(max_sequence_length, group_size);
 }
 
 int main(int argc, char** argv)
@@ -273,9 +289,9 @@ int main(int argc, char** argv)
     bool benchmark   = false;
 
     // following parameters are used in benchmarking only
-    int32_t number_of_windows = 0;
-    int32_t sequence_size     = 0;
-    int32_t group_size        = 0;
+    uint32_t number_of_windows = 0;
+    uint32_t sequence_size     = 0;
+    uint32_t group_size        = 0;
 
     while ((c = getopt(argc, argv, "mlhpgbW:S:N:")) != -1)
     {
@@ -345,7 +361,7 @@ int main(int argc, char** argv)
     {
         if (long_read)
         {
-            generate_simulated_long_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
+            generate_simulated_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
             //generate_bonito_long_reads(windows, batch_size, sequence_size, group_size);
         }
         else
