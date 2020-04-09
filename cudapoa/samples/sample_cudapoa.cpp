@@ -362,11 +362,11 @@ int main(int argc, char** argv)
         if (long_read)
         {
             generate_simulated_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
-            //generate_bonito_long_reads(windows, batch_size, sequence_size, group_size);
+            //generate_bonito_long_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
         }
         else
         {
-            generate_short_reads(windows, batch_size, sequence_size, group_size);
+            generate_short_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
         }
     }
     else
@@ -483,13 +483,16 @@ int main(int argc, char** argv)
     {
         std::cerr << "benchmark summary:\n";
         std::cerr << "=========================================================================================================\n";
-        std::cerr << "Number of windows(W) " << std::left << std::setw(13) << std::setfill(' ') << number_of_windows;
-        std::cerr << "Sequence lengthv(S) " << std::left << std::setw(10) << std::setfill(' ') << sequence_size;
+        std::cerr << "Number of windows(W) " << std::left << std::setw(14) << std::setfill(' ') << number_of_windows;
+        std::cerr << "Sequence length(S) " << std::left << std::setw(11) << std::setfill(' ') << sequence_size;
         std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << std::setfill(' ') << group_size << std::endl;
-        std::cerr << "Compute time:                     cudaPOA " << cudapoa_time << "(sec),           SPOA " << spoa_time << "(sec)\n";
+
+        std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << cudapoa_time;
+        std::cerr << "SPOA " << std::fixed << std::setprecision(2) << spoa_time << std::endl;
+
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
-        std::cerr << "Expected performance:             cudaPOA " << (float)number_of_bases / cudapoa_time << "(bases/sec),    SPOA ";
-        std::cerr << (float)number_of_bases / spoa_time << "(bases/sec)" << std::endl;
+        std::cerr << "Expected performance (bases/sec):  cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
+        std::cerr <<(float)number_of_bases / cudapoa_time << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
         int32_t actual_number_of_bases = 0;
         for (auto& w : windows)
         {
@@ -498,8 +501,19 @@ int main(int argc, char** argv)
                 actual_number_of_bases += get_size(seq);
             }
         }
-        std::cerr << "Effective performance:            cudaPOA " << (float)actual_number_of_bases / cudapoa_time << "(bases/sec),    SPOA ";
-        std::cerr << (float)actual_number_of_bases / spoa_time << "(bases/sec)" << std::endl;
+        float effective_perf_cupoa = (float)actual_number_of_bases / cudapoa_time;
+        float effective_perf_spoa  = (float)actual_number_of_bases / spoa_time;
+        std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
+        std::cerr << effective_perf_cupoa << "SPOA "<< std::left << std::setw(20) << effective_perf_spoa;
+        if(effective_perf_cupoa > effective_perf_spoa)
+        {
+            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa/effective_perf_spoa << " faster" << std::endl;
+        }
+        else
+        {
+            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa/effective_perf_cupoa << " slower" << std::endl;
+        }
+
         std::cerr << "Expected number of bases (S x N x W) = " << number_of_bases << std::endl;
         std::cerr << "Actual total number of bases         = " << actual_number_of_bases << std::endl;
         std::cerr << "=========================================================================================================\n";
