@@ -292,8 +292,10 @@ int main(int argc, char** argv)
     uint32_t number_of_windows = 0;
     uint32_t sequence_size     = 0;
     uint32_t group_size        = 0;
+    // benchmark mode 0: runs only cudaPOA, 1: runs only SPOA, 2: runs both (default)
+    uint32_t benchmark_mode    = 2;
 
-    while ((c = getopt(argc, argv, "mlhpgbBW:S:N:")) != -1)
+    while ((c = getopt(argc, argv, "mlhpgbBW:S:N:M:")) != -1)
     {
         switch (c)
         {
@@ -324,6 +326,9 @@ int main(int argc, char** argv)
         case 'N':
             group_size = atoi(optarg);
             break;
+        case 'M':
+        benchmark_mode = atoi(optarg);
+        break;
         case 'h':
             help = true;
             break;
@@ -344,6 +349,7 @@ int main(int argc, char** argv)
         std::cout << "-W : Number of total windows used in benchmarking" << std::endl;
         std::cout << "-S : Maximum sequence length in benchmarking" << std::endl;
         std::cout << "-N : Number of sequences per POA group" << std::endl;
+        std::cout << "-M : 0, 1, 2. Only used in benchmarking: -M 0, runs only cudaPOA, -M 1, runs only SPOA, -M 2, default, runs both" << std::endl;
         std::cout << "-h : Print help message" << std::endl;
         std::exit(0);
     }
@@ -422,13 +428,19 @@ int main(int argc, char** argv)
             // No more POA groups can be added to batch. Now process batch.
             if (benchmark)
             {
-                timer.start_timer();
-                process_batch(batch.get(), msa, print);
-                cudapoa_time += timer.stop_timer();
+                if(benchmark_mode != 1)
+                {
+                    timer.start_timer();
+                    process_batch(batch.get(), msa, print);
+                    cudapoa_time += timer.stop_timer();
+                }
 
-                timer.start_timer();
-                spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa, print);
-                spoa_time += timer.stop_timer();
+                if(benchmark_mode != 0)
+                {
+                    timer.start_timer();
+                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa, print);
+                    spoa_time += timer.stop_timer();
+                }
             }
             else
             {
@@ -496,12 +508,28 @@ int main(int argc, char** argv)
         else
             std::cerr << "OFF\n";
         std::cerr << "---------------------------------------------------------------------------------------------------------\n";
-        std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << cudapoa_time;
-        std::cerr << "SPOA " << std::fixed << std::setprecision(2) << spoa_time << std::endl;
+        std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(22);
+        if(benchmark_mode == 1)
+            std::cerr << "NA";
+        else
+            std::cerr << std::fixed << std::setprecision(2) << cudapoa_time;
+        std::cerr << "SPOA ";
+        if(benchmark_mode == 0)
+            std::cerr << "NA" << std::endl;
+        else
+            std::cerr << std::fixed << std::setprecision(2) << spoa_time << std::endl;
         std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
-        std::cerr << "Expected performance (bases/sec):  cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
-        std::cerr << (float)number_of_bases / cudapoa_time << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
+        std::cerr << "Expected performance (bases/sec):  cudaPOA ";
+        std::cerr << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
+        if(benchmark_mode == 1)
+            std::cerr << "NA";
+        else
+            std::cerr << (float)number_of_bases / cudapoa_time;
+        if(benchmark_mode == 0)
+            std::cerr << "SPOA NA"<< std::endl;
+        else
+            std::cerr << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
         int32_t actual_number_of_bases = 0;
         for (auto& w : windows)
         {
@@ -513,12 +541,22 @@ int main(int argc, char** argv)
         float effective_perf_cupoa = (float)actual_number_of_bases / cudapoa_time;
         float effective_perf_spoa  = (float)actual_number_of_bases / spoa_time;
         std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
-        std::cerr << effective_perf_cupoa << "SPOA " << std::left << std::setw(19) << effective_perf_spoa;
-        if (effective_perf_cupoa > effective_perf_spoa)
-            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa / effective_perf_spoa << " faster" << std::endl;
+        if(benchmark_mode == 1)
+            std::cerr << "NA";
         else
-            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower" << std::endl;
-        std::cerr << "---------------------------------------------------------------------------------------------------------\n";
+            std::cerr << effective_perf_cupoa;
+        if(benchmark_mode == 0)
+            std::cerr << "SPOA NA";
+        else
+            std::cerr << "SPOA " << std::left << std::setw(19) << effective_perf_spoa;
+        if(benchmark_mode == 2)
+        {
+            if (effective_perf_cupoa > effective_perf_spoa)
+                std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa / effective_perf_spoa << " faster";
+            else
+                std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower";
+        }
+        std::cerr << "\n---------------------------------------------------------------------------------------------------------\n";
         std::cerr << "Expected number of bases (S x N x W) = " << number_of_bases << std::endl;
         std::cerr << "Actual total number of bases         = " << actual_number_of_bases << std::endl;
         std::cerr << "=========================================================================================================\n\n";
