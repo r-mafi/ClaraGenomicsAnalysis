@@ -492,7 +492,7 @@ int main(int argc, char** argv)
 
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
         std::cerr << "Expected performance (bases/sec):  cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
-        std::cerr <<(float)number_of_bases / cudapoa_time << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
+        std::cerr << (float)number_of_bases / cudapoa_time << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
         int32_t actual_number_of_bases = 0;
         for (auto& w : windows)
         {
@@ -504,14 +504,14 @@ int main(int argc, char** argv)
         float effective_perf_cupoa = (float)actual_number_of_bases / cudapoa_time;
         float effective_perf_spoa  = (float)actual_number_of_bases / spoa_time;
         std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
-        std::cerr << effective_perf_cupoa << "SPOA "<< std::left << std::setw(20) << effective_perf_spoa;
-        if(effective_perf_cupoa > effective_perf_spoa)
+        std::cerr << effective_perf_cupoa << "SPOA " << std::left << std::setw(19) << effective_perf_spoa;
+        if (effective_perf_cupoa > effective_perf_spoa)
         {
-            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa/effective_perf_spoa << " faster" << std::endl;
+            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa / effective_perf_spoa << " faster" << std::endl;
         }
         else
         {
-            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa/effective_perf_cupoa << " slower" << std::endl;
+            std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower" << std::endl;
         }
 
         std::cerr << "Expected number of bases (S x N x W) = " << number_of_bases << std::endl;
