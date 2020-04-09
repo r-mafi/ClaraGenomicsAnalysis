@@ -29,7 +29,7 @@
 using namespace claragenomics;
 using namespace claragenomics::cudapoa;
 
-std::unique_ptr<Batch> initialize_batch(bool msa, const BatchSize& batch_size)
+std::unique_ptr<Batch> initialize_batch(bool msa, const BatchSize& batch_size, bool banded_alignment = false)
 {
     // Get device information.
     int32_t device_count = 0;
@@ -48,7 +48,6 @@ std::unique_ptr<Batch> initialize_batch(bool msa, const BatchSize& batch_size)
     cudaStream_t stream          = 0;
     size_t mem_per_batch         = 0.9 * free; // Using 90% of GPU available memory for CUDAPOA batch.
     const int32_t mismatch_score = -6, gap_score = -8, match_score = 8;
-    bool banded_alignment = false;
 
     std::unique_ptr<Batch> batch = create_batch(device_id,
                                                 stream,
@@ -287,13 +286,14 @@ int main(int argc, char** argv)
     bool print       = false;
     bool print_graph = false;
     bool benchmark   = false;
+    bool banded      = false;
 
     // following parameters are used in benchmarking only
     uint32_t number_of_windows = 0;
     uint32_t sequence_size     = 0;
     uint32_t group_size        = 0;
 
-    while ((c = getopt(argc, argv, "mlhpgbW:S:N:")) != -1)
+    while ((c = getopt(argc, argv, "mlhpgbBW:S:N:")) != -1)
     {
         switch (c)
         {
@@ -311,6 +311,9 @@ int main(int argc, char** argv)
             break;
         case 'b':
             benchmark = true;
+            break;
+        case 'B':
+            banded = true;
             break;
         case 'W':
             number_of_windows = atoi(optarg);
@@ -337,6 +340,7 @@ int main(int argc, char** argv)
         std::cout << "-p : Print the MSA or consensus output to stdout" << std::endl;
         std::cout << "-g : Print POA graph in dot format, this option is only for long-read sample" << std::endl;
         std::cout << "-b : Benchmark against SPOA" << std::endl;
+        std::cout << "-B : cudaPOA is computed as banded" << std::endl;
         std::cout << "-W : Number of total windows used in benchmarking" << std::endl;
         std::cout << "-S : Maximum sequence length in benchmarking" << std::endl;
         std::cout << "-N : Number of sequences per POA group" << std::endl;
@@ -382,7 +386,7 @@ int main(int argc, char** argv)
     }
 
     // Initialize batch.
-    std::unique_ptr<Batch> batch = initialize_batch(msa, batch_size);
+    std::unique_ptr<Batch> batch = initialize_batch(msa, batch_size, banded);
 
     // Loop over all the POA groups, add them to the batch and process them.
     int32_t window_count = 0;
@@ -481,15 +485,20 @@ int main(int argc, char** argv)
 
     if (benchmark)
     {
-        std::cerr << "benchmark summary:\n";
+        std::cerr << "\nbenchmark summary:\n";
         std::cerr << "=========================================================================================================\n";
         std::cerr << "Number of windows(W) " << std::left << std::setw(14) << std::setfill(' ') << number_of_windows;
         std::cerr << "Sequence length(S) " << std::left << std::setw(11) << std::setfill(' ') << sequence_size;
         std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << std::setfill(' ') << group_size << std::endl;
-
+        std::cerr << "Banded alignment for cudaPOA:      ";
+        if (banded)
+            std::cerr << "ON\n";
+        else
+            std::cerr << "OFF\n";
+        std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << cudapoa_time;
         std::cerr << "SPOA " << std::fixed << std::setprecision(2) << spoa_time << std::endl;
-
+        std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
         std::cerr << "Expected performance (bases/sec):  cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
         std::cerr << (float)number_of_bases / cudapoa_time << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
@@ -506,17 +515,13 @@ int main(int argc, char** argv)
         std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
         std::cerr << effective_perf_cupoa << "SPOA " << std::left << std::setw(19) << effective_perf_spoa;
         if (effective_perf_cupoa > effective_perf_spoa)
-        {
             std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa / effective_perf_spoa << " faster" << std::endl;
-        }
         else
-        {
             std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower" << std::endl;
-        }
-
+        std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         std::cerr << "Expected number of bases (S x N x W) = " << number_of_bases << std::endl;
         std::cerr << "Actual total number of bases         = " << actual_number_of_bases << std::endl;
-        std::cerr << "=========================================================================================================\n";
+        std::cerr << "=========================================================================================================\n\n";
     }
 
     return 0;
