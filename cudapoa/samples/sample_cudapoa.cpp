@@ -193,20 +193,10 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups, const int
     }
 }
 
-void generate_short_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                          const uint32_t number_of_windows = 1000, const uint32_t sequence_size = 1024, const uint32_t group_size = 100)
+void generate_window_data(const std::string& input_file, const int number_of_windows, const int max_sequences_per_poa,
+                          std::vector<std::vector<std::string>>& windows, BatchSize& batch_size)
 {
-    const std::string input_data = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-windows.txt";
-    parse_window_data_file(windows, input_data, number_of_windows); // Generate windows.
-    assert(get_size(windows) > 0);
-    batch_size = BatchSize(sequence_size, group_size);
-}
-
-void generate_bonito_long_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                                const uint32_t number_of_windows = 5, const uint32_t sequence_size = 20000, const uint32_t group_size = 6)
-{
-    const std::string input_data = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-bonito.txt";
-    parse_window_data_file(windows, input_data, number_of_windows); // Generate windows.
+    parse_window_data_file(windows, input_file, number_of_windows); // Generate windows.
     assert(get_size(windows) > 0);
 
     int32_t max_read_length = 0;
@@ -218,9 +208,16 @@ void generate_bonito_long_reads(std::vector<std::vector<std::string>>& windows, 
         }
     }
 
-    assert(sequence_size >= max_read_length);
+    batch_size = BatchSize(max_read_length, max_sequences_per_poa);
+}
 
-    batch_size = BatchSize(max_read_length, group_size);
+void generate_short_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
+                          const uint32_t number_of_windows = 1000, const uint32_t sequence_size = 1024, const uint32_t group_size = 100)
+{
+    const std::string input_data = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-windows.txt";
+    parse_window_data_file(windows, input_data, number_of_windows); // Generate windows.
+    assert(get_size(windows) > 0);
+    batch_size = BatchSize(sequence_size, group_size);
 }
 
 // the following function can create simulated reads in an arbitrary number of windows with given sequence length and POA group size
@@ -293,7 +290,7 @@ int main(int argc, char** argv)
     uint32_t sequence_size     = 0;
     uint32_t group_size        = 0;
     // benchmark mode 0: runs only cudaPOA, 1: runs only SPOA, 2: runs both (default)
-    uint32_t benchmark_mode    = 2;
+    uint32_t benchmark_mode = 2;
 
     while ((c = getopt(argc, argv, "mlhpgbBW:S:N:M:")) != -1)
     {
@@ -327,8 +324,8 @@ int main(int argc, char** argv)
             group_size = atoi(optarg);
             break;
         case 'M':
-        benchmark_mode = atoi(optarg);
-        break;
+            benchmark_mode = atoi(optarg);
+            break;
         case 'h':
             help = true;
             break;
@@ -372,7 +369,6 @@ int main(int argc, char** argv)
         if (long_read)
         {
             generate_simulated_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
-            //generate_bonito_long_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
         }
         else
         {
@@ -383,11 +379,13 @@ int main(int argc, char** argv)
     {
         if (long_read)
         {
-            generate_bonito_long_reads(windows, batch_size);
+            const std::string input_file = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-bonito.txt";
+            generate_window_data(input_file, 8, 6, windows, batch_size);
         }
         else
         {
-            generate_short_reads(windows, batch_size);
+            const std::string input_file = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-windows.txt";
+            generate_window_data(input_file, 1000, 100, windows, batch_size);
         }
     }
 
@@ -428,14 +426,14 @@ int main(int argc, char** argv)
             // No more POA groups can be added to batch. Now process batch.
             if (benchmark)
             {
-                if(benchmark_mode != 1)
+                if (benchmark_mode != 1)
                 {
                     timer.start_timer();
                     process_batch(batch.get(), msa, print);
                     cudapoa_time += timer.stop_timer();
                 }
 
-                if(benchmark_mode != 0)
+                if (benchmark_mode != 0)
                 {
                     timer.start_timer();
                     spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa, print);
@@ -461,6 +459,9 @@ int main(int argc, char** argv)
             // After MSA/consensus is generated for batch, reset batch to make room for next set of POA groups.
             batch->reset();
 
+            // In case that number of windows is more than the capacity available on GPU, the for loop breaks into smaller number of windows.
+            // if adding window i in batch->add_poa_group is not successful, it wont be processed in this iteration, therefore we print i-1
+            // to account for the fact that window i was excluded at this round.
             if (status == StatusType::success)
             {
                 std::cout << "Processed windows " << window_count << " - " << i << std::endl;
@@ -509,12 +510,12 @@ int main(int argc, char** argv)
             std::cerr << "OFF\n";
         std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(22);
-        if(benchmark_mode == 1)
+        if (benchmark_mode == 1)
             std::cerr << "NA";
         else
             std::cerr << std::fixed << std::setprecision(2) << cudapoa_time;
         std::cerr << "SPOA ";
-        if(benchmark_mode == 0)
+        if (benchmark_mode == 0)
             std::cerr << "NA" << std::endl;
         else
             std::cerr << std::fixed << std::setprecision(2) << spoa_time << std::endl;
@@ -522,12 +523,12 @@ int main(int argc, char** argv)
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
         std::cerr << "Expected performance (bases/sec):  cudaPOA ";
         std::cerr << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
-        if(benchmark_mode == 1)
+        if (benchmark_mode == 1)
             std::cerr << "NA";
         else
             std::cerr << (float)number_of_bases / cudapoa_time;
-        if(benchmark_mode == 0)
-            std::cerr << "SPOA NA"<< std::endl;
+        if (benchmark_mode == 0)
+            std::cerr << "SPOA NA" << std::endl;
         else
             std::cerr << "SPOA " << (float)number_of_bases / spoa_time << std::endl;
         int32_t actual_number_of_bases = 0;
@@ -541,15 +542,15 @@ int main(int argc, char** argv)
         float effective_perf_cupoa = (float)actual_number_of_bases / cudapoa_time;
         float effective_perf_spoa  = (float)actual_number_of_bases / spoa_time;
         std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
-        if(benchmark_mode == 1)
+        if (benchmark_mode == 1)
             std::cerr << "NA";
         else
             std::cerr << effective_perf_cupoa;
-        if(benchmark_mode == 0)
+        if (benchmark_mode == 0)
             std::cerr << "SPOA NA";
         else
             std::cerr << "SPOA " << std::left << std::setw(19) << effective_perf_spoa;
-        if(benchmark_mode == 2)
+        if (benchmark_mode == 2)
         {
             if (effective_perf_cupoa > effective_perf_spoa)
                 std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_cupoa / effective_perf_spoa << " faster";
