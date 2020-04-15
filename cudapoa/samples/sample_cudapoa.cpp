@@ -62,16 +62,18 @@ std::unique_ptr<Batch> initialize_batch(bool msa, const BatchSize& batch_size, b
     return std::move(batch);
 }
 
-void process_batch(Batch* batch, bool msa, bool print)
+void process_batch(Batch* batch, bool msa_flag, bool print,
+                   std::vector<std::vector<std::string>>& msa,
+                   std::vector<std::string>& consensus,
+                   std::vector<std::vector<uint16_t>>& coverage)
 {
     batch->generate_poa();
 
     StatusType status = StatusType::success;
-    if (msa)
+    if (msa_flag)
     {
         // Grab MSA results for all POA groups in batch.
-        std::vector<std::vector<std::string>> msa; // MSA per group
-        std::vector<StatusType> output_status;     // Status of MSA generation per group
+        std::vector<StatusType> output_status; // Status of MSA generation per group
 
         status = batch->get_msa(msa, output_status);
         if (status != StatusType::success)
@@ -99,10 +101,8 @@ void process_batch(Batch* batch, bool msa, bool print)
     }
     else
     {
-        // Grab consensus results for all POA groups in batch.
-        std::vector<std::string> consensus;          // Consensus string for each POA group
-        std::vector<std::vector<uint16_t>> coverage; // Per base coverage for each consensus
-        std::vector<StatusType> output_status;       // Status of consensus generation per group
+        // Grab consensus results for all POA groups in batch
+        std::vector<StatusType> output_status; // Status of consensus generation per group
 
         status = batch->get_consensus(consensus, coverage, output_status);
         if (status != StatusType::success)
@@ -127,7 +127,12 @@ void process_batch(Batch* batch, bool msa, bool print)
     }
 }
 
-void spoa_compute(const std::vector<std::vector<std::string>>& groups, const int32_t start_id, const int32_t end_id, bool msa, bool print)
+void spoa_compute(const std::vector<std::vector<std::string>>& groups,
+                  const int32_t start_id, const int32_t end_id,
+                  bool msa_flag, bool print,
+                  std::vector<std::vector<std::string>>& msa,
+                  std::vector<std::string>& consensus,
+                  std::vector<std::vector<uint32_t>>& coverage)
 {
     spoa::AlignmentType atype = spoa::AlignmentType::kNW;
     int match_score           = 8;
@@ -137,10 +142,10 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups, const int
     auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
     auto graph            = spoa::createGraph();
 
-    if (msa)
+    if (msa_flag)
     {
         // Grab MSA results for all groups within the range
-        std::vector<std::vector<std::string>> msa(end_id - start_id); // MSA per group
+        msa.resize(end_id - start_id); // MSA per group
 
         for (int32_t g = start_id; g < end_id; g++)
         {
@@ -169,8 +174,8 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups, const int
     else
     {
         // Grab consensus results for all POA groups within the range
-        std::vector<std::string> consensus(end_id - start_id);          // Consensus string for each POA group
-        std::vector<std::vector<uint32_t>> coverage(end_id - start_id); // Per base coverage for each consensus
+        consensus.resize(end_id - start_id); // Consensus string for each POA group
+        coverage.resize(end_id - start_id);  // Per base coverage for each consensus
 
         for (int32_t g = start_id; g < end_id; g++)
         {
@@ -273,7 +278,7 @@ int main(int argc, char** argv)
 {
     // Process options
     int c            = 0;
-    bool msa         = false;
+    bool msa_flag    = false;
     bool long_read   = false;
     bool help        = false;
     bool print       = false;
@@ -293,7 +298,7 @@ int main(int argc, char** argv)
         switch (c)
         {
         case 'm':
-            msa = true;
+            msa_flag = true;
             break;
         case 'l':
             long_read = true;
@@ -387,7 +392,7 @@ int main(int argc, char** argv)
     }
 
     // Initialize batch.
-    std::unique_ptr<Batch> batch = initialize_batch(msa, batch_size, banded);
+    std::unique_ptr<Batch> batch = initialize_batch(msa_flag, batch_size, banded);
 
     // Loop over all the POA groups, add them to the batch and process them.
     int32_t window_count = 0;
@@ -397,6 +402,11 @@ int main(int argc, char** argv)
     float cudapoa_time = 0.f;
     float spoa_time    = 0.f;
     ChronoTimer timer;
+
+    std::vector<std::vector<std::string>> msa;      // MSA per group
+    std::vector<std::string> consensus;             // Consensus string for each POA group
+    std::vector<std::vector<uint16_t>> coverage_16; // Per base coverage for each consensus, for cudapoa
+    std::vector<std::vector<uint32_t>> coverage_32; // Per base coverage for each consensus, for spoa
 
     for (int32_t i = 0; i < get_size(windows);)
     {
@@ -426,20 +436,20 @@ int main(int argc, char** argv)
                 if (benchmark_mode != 1)
                 {
                     timer.start_timer();
-                    process_batch(batch.get(), msa, print);
+                    process_batch(batch.get(), msa_flag, print, msa, consensus, coverage_16);
                     cudapoa_time += timer.stop_timer();
                 }
 
                 if (benchmark_mode != 0)
                 {
                     timer.start_timer();
-                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa, print);
+                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa_flag, print, msa, consensus, coverage_32);
                     spoa_time += timer.stop_timer();
                 }
             }
             else
             {
-                process_batch(batch.get(), msa, print);
+                process_batch(batch.get(), msa_flag, print, msa, consensus, coverage_16);
             }
 
             if (print_graph && long_read)
