@@ -349,8 +349,8 @@ int main(int argc, char** argv)
 
     // if not defined as input args, set default values for benchmarking parameters
     number_of_windows = number_of_windows == 0 ? (long_read ? 10 : 1000) : number_of_windows;
+    sequence_size     = sequence_size == 0 ? (long_read ? 10000 : 1024) : sequence_size;
     group_size        = group_size == 0 ? (long_read ? 6 : 100) : group_size;
-    sequence_size     = sequence_size == 0 ? 10000 : sequence_size;
 
     // Load input data. Each POA group is represented as a vector of strings. The sample
     // data for short reads has many such POA groups to process, hence the data is loaded into a vector
@@ -555,8 +555,10 @@ int main(int argc, char** argv)
                 std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower";
         }
         std::cerr << "\n---------------------------------------------------------------------------------------------------------\n";
-        std::cerr << "Expected number of bases (S x N x W) = " << number_of_bases << std::endl;
-        std::cerr << "Actual total number of bases         = " << actual_number_of_bases << std::endl;
+        std::cerr << "Assumed number of bases (S x N x W) = " << std::left << std::setw(27) << number_of_bases;
+        std::cerr << "Assumed max sequence length = " << sequence_size << std::endl;
+        std::cerr << "Actual total number of bases        = " << std::left << std::setw(27) << actual_number_of_bases;
+        std::cerr << "Actual max sequence length  = " << batch_size.max_sequence_size << std::endl;
         std::cerr << "=========================================================================================================\n\n";
     }
 
