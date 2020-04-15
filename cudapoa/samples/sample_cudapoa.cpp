@@ -211,18 +211,9 @@ void generate_window_data(const std::string& input_file, const int number_of_win
     batch_size = BatchSize(max_read_length, max_sequences_per_poa);
 }
 
-void generate_short_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                          const uint32_t number_of_windows = 1000, const uint32_t sequence_size = 1024, const uint32_t group_size = 100)
-{
-    const std::string input_data = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-windows.txt";
-    parse_window_data_file(windows, input_data, number_of_windows); // Generate windows.
-    assert(get_size(windows) > 0);
-    batch_size = BatchSize(sequence_size, group_size);
-}
-
 // the following function can create simulated reads in an arbitrary number of windows with given sequence length and POA group size
-void generate_simulated_reads(std::vector<std::vector<std::string>>& windows, BatchSize& batch_size,
-                              const uint32_t number_of_windows = 2, const uint32_t sequence_size = 10000, const uint32_t group_size = 5)
+void generate_simulated_reads(const uint32_t number_of_windows, const uint32_t sequence_size, const uint32_t group_size,
+                              std::vector<std::vector<std::string>>& windows, BatchSize& batch_size)
 {
     constexpr uint32_t random_seed = 5827349;
     std::minstd_rand rng(random_seed);
@@ -232,14 +223,17 @@ void generate_simulated_reads(std::vector<std::vector<std::string>>& windows, Ba
     // create variation_ranges used to generate some random variations in random positions
     std::vector<std::pair<int, int>> variation_ranges;
     uint32_t range_begin, range_end, range_width;
-    uint32_t max_range_width = sequence_size / 20;
+    const int32_t num_ranges = 10;
+    uint32_t max_range_width = sequence_size / (2 * num_ranges);
     uint32_t step_size       = 2 * max_range_width;
-    for (uint32_t start_idx = 0; start_idx < sequence_size; start_idx += step_size)
+    uint32_t start_idx       = 0;
+    for (uint32_t i = 0; i < num_ranges; i++)
     {
         if (step_size == 0)
         {
             break;
         }
+
         std::uniform_int_distribution<uint32_t> random_pos(start_idx, start_idx + step_size);
         range_begin = random_pos(rng);
         std::uniform_int_distribution<uint32_t> random_width(0, max_range_width);
@@ -254,6 +248,8 @@ void generate_simulated_reads(std::vector<std::vector<std::string>>& windows, Ba
             range_end = range_begin + range_width;
         }
         variation_ranges.push_back(std::pair<int, int>(range_begin, range_end));
+
+        start_idx += step_size;
     }
 
     std::vector<std::string> long_reads(group_size);
@@ -353,8 +349,8 @@ int main(int argc, char** argv)
 
     // if not defined as input args, set default values for benchmarking parameters
     number_of_windows = number_of_windows == 0 ? (long_read ? 10 : 1000) : number_of_windows;
-    sequence_size     = sequence_size == 0 ? (long_read ? 10000 : 1024) : sequence_size;
     group_size        = group_size == 0 ? (long_read ? 6 : 100) : group_size;
+    sequence_size     = sequence_size == 0 ? 10000 : sequence_size;
 
     // Load input data. Each POA group is represented as a vector of strings. The sample
     // data for short reads has many such POA groups to process, hence the data is loaded into a vector
@@ -368,11 +364,12 @@ int main(int argc, char** argv)
     {
         if (long_read)
         {
-            generate_simulated_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
+            generate_simulated_reads(number_of_windows, sequence_size, group_size, windows, batch_size);
         }
         else
         {
-            generate_short_reads(windows, batch_size, number_of_windows, sequence_size, group_size);
+            const std::string input_file = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-windows.txt";
+            generate_window_data(input_file, number_of_windows, group_size, windows, batch_size);
         }
     }
     else
