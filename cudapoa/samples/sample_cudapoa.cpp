@@ -403,10 +403,13 @@ int main(int argc, char** argv)
     float spoa_time    = 0.f;
     ChronoTimer timer;
 
-    std::vector<std::vector<std::string>> msa;      // MSA per group
-    std::vector<std::string> consensus;             // Consensus string for each POA group
-    std::vector<std::vector<uint16_t>> coverage_16; // Per base coverage for each consensus, for cudapoa
-    std::vector<std::vector<uint32_t>> coverage_32; // Per base coverage for each consensus, for spoa
+    // results vectors
+    std::vector<std::vector<std::string>> msa_c;   // MSA per group, for cudapoa
+    std::vector<std::string> consensus_c;          // Consensus string for each POA group, for cudapoa
+    std::vector<std::vector<uint16_t>> coverage_c; // Per base coverage for each consensus, for cudapoa
+    std::vector<std::vector<std::string>> msa_s;   // MSA per group, for spoa
+    std::vector<std::string> consensus_s;          // Consensus string for each POA group, for spoa
+    std::vector<std::vector<uint32_t>> coverage_s; // Per base coverage for each consensus, for spoa
 
     for (int32_t i = 0; i < get_size(windows);)
     {
@@ -436,20 +439,20 @@ int main(int argc, char** argv)
                 if (benchmark_mode != 1)
                 {
                     timer.start_timer();
-                    process_batch(batch.get(), msa_flag, print, msa, consensus, coverage_16);
+                    process_batch(batch.get(), msa_flag, print, msa_c, consensus_c, coverage_c);
                     cudapoa_time += timer.stop_timer();
                 }
 
                 if (benchmark_mode != 0)
                 {
                     timer.start_timer();
-                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa_flag, print, msa, consensus, coverage_32);
+                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa_flag, print, msa_s, consensus_s, coverage_s);
                     spoa_time += timer.stop_timer();
                 }
             }
             else
             {
-                process_batch(batch.get(), msa_flag, print, msa, consensus, coverage_16);
+                process_batch(batch.get(), msa_flag, print, msa_c, consensus_c, coverage_c);
             }
 
             if (print_graph && long_read)
