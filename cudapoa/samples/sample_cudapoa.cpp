@@ -531,7 +531,7 @@ int main(int argc, char** argv)
             std::cerr << std::fixed << std::setprecision(2) << spoa_time << std::endl;
         std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
-        std::cerr << "Expected performance (bases/sec):  cudaPOA ";
+        std::cerr << "Expected performance (bases/sec) : cudaPOA ";
         std::cerr << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
         if (benchmark_mode == 1)
             std::cerr << "NA";
@@ -559,7 +559,7 @@ int main(int argc, char** argv)
         if (benchmark_mode == 0)
             std::cerr << "SPOA NA";
         else
-            std::cerr << "SPOA " << std::left << std::setw(19) << effective_perf_spoa;
+            std::cerr << "SPOA " << std::left << std::setw(17) << effective_perf_spoa;
         if (benchmark_mode == 2)
         {
             if (effective_perf_cupoa > effective_perf_spoa)
@@ -568,11 +568,39 @@ int main(int argc, char** argv)
                 std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower";
         }
         std::cerr << "\n---------------------------------------------------------------------------------------------------------\n";
-        std::cerr << "Assumed number of bases (S x N x W) = " << std::left << std::setw(27) << number_of_bases;
-        std::cerr << "Assumed max sequence length = " << sequence_size << std::endl;
-        std::cerr << "Actual total number of bases        = " << std::left << std::setw(27) << actual_number_of_bases;
-        std::cerr << "Actual max sequence length  = " << batch_size.max_sequence_size << std::endl;
-        std::cerr << "=========================================================================================================\n\n";
+        std::vector<int32_t> consensus_lengths_c (number_of_windows);
+        std::vector<int32_t> consensus_lengths_s (number_of_windows);
+        int32_t sum_consensus_length_c = 0;
+        int32_t sum_consensus_length_s = 0;
+        std::cerr << "Average consensus length:          cudaPOA " << std::left << std::setw(22);
+        if (benchmark_mode == 1 || msa_flag)
+            std::cerr << "NA";
+        else
+        {
+            for(int w = 0; w < number_of_windows; w++)
+            {
+                consensus_lengths_c[w] = consensus_c[w].length();
+                sum_consensus_length_c += consensus_lengths_c[w];
+            }
+            std::cerr << sum_consensus_length_c/number_of_windows;
+        }
+        if (benchmark_mode == 0 || msa_flag)
+            std::cerr << "SPOA NA" << std::endl;
+        else
+        {
+            for(int w = 0; w < number_of_windows; w++)
+            {
+                consensus_lengths_s[w] = consensus_s[w].length();
+                sum_consensus_length_s += consensus_lengths_s[w];
+            }
+            std::cerr << "SPOA " << std::left << std::setw(17) << sum_consensus_length_s/number_of_windows;
+        }
+        if (benchmark_mode == 2 && !msa_flag)
+        {
+            float diff = 100.0f * (float)abs(sum_consensus_length_s - sum_consensus_length_c) / (float)sum_consensus_length_s;
+            std::cerr << std::fixed << std::setprecision(0) << (100 - diff) << "% similar";
+        }
+        std::cerr << "\n=========================================================================================================\n\n";
     }
 
     return 0;
