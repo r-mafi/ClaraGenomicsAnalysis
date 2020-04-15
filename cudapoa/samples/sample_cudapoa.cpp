@@ -285,6 +285,7 @@ int main(int argc, char** argv)
     bool print_graph = false;
     bool benchmark   = false;
     bool banded      = false;
+    bool verbose     = false;
 
     // following parameters are used in benchmarking only
     uint32_t number_of_windows = 0;
@@ -293,7 +294,7 @@ int main(int argc, char** argv)
     // benchmark mode 0: runs only cudaPOA, 1: runs only SPOA, 2: runs both (default)
     uint32_t benchmark_mode = 2;
 
-    while ((c = getopt(argc, argv, "mlhpgbBW:S:N:M:")) != -1)
+    while ((c = getopt(argc, argv, "mlhpgbBVW:S:N:M:")) != -1)
     {
         switch (c)
         {
@@ -314,6 +315,9 @@ int main(int argc, char** argv)
             break;
         case 'B':
             banded = true;
+            break;
+        case 'V':
+            verbose = true;
             break;
         case 'W':
             number_of_windows = atoi(optarg);
@@ -344,6 +348,7 @@ int main(int argc, char** argv)
         std::cout << "-g : Print POA graph in dot format, this option is only for long-read sample" << std::endl;
         std::cout << "-b : Benchmark against SPOA" << std::endl;
         std::cout << "-B : cudaPOA is computed as banded" << std::endl;
+        std::cout << "-V : Verbose mode, this option is only for benchmark mode. It will output accuracy details per window as opposed to average metrics in benchmark report" << std::endl;
         std::cout << "-W : Number of total windows used in benchmarking" << std::endl;
         std::cout << "-S : Maximum sequence length in benchmarking" << std::endl;
         std::cout << "-N : Number of sequences per POA group" << std::endl;
@@ -568,39 +573,72 @@ int main(int argc, char** argv)
                 std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower";
         }
         std::cerr << "\n---------------------------------------------------------------------------------------------------------\n";
-        std::vector<int32_t> consensus_lengths_c (number_of_windows);
-        std::vector<int32_t> consensus_lengths_s (number_of_windows);
-        int32_t sum_consensus_length_c = 0;
-        int32_t sum_consensus_length_s = 0;
-        std::cerr << "Average consensus length:          cudaPOA " << std::left << std::setw(22);
-        if (benchmark_mode == 1 || msa_flag)
-            std::cerr << "NA";
-        else
+        if (!msa_flag)
         {
-            for(int w = 0; w < number_of_windows; w++)
+            std::vector<int32_t> consensus_lengths_c(number_of_windows);
+            std::vector<int32_t> consensus_lengths_s(number_of_windows);
+            int32_t sum_consensus_length_c = 0;
+            int32_t sum_consensus_length_s = 0;
+            int32_t sum_abs_diff           = 0;
+            if (benchmark_mode != 1)
             {
-                consensus_lengths_c[w] = consensus_c[w].length();
-                sum_consensus_length_c += consensus_lengths_c[w];
+                for (int w = 0; w < number_of_windows; w++)
+                {
+                    consensus_lengths_c[w] = consensus_c[w].length();
+                    sum_consensus_length_c += consensus_lengths_c[w];
+                }
             }
-            std::cerr << sum_consensus_length_c/number_of_windows;
-        }
-        if (benchmark_mode == 0 || msa_flag)
-            std::cerr << "SPOA NA" << std::endl;
-        else
-        {
-            for(int w = 0; w < number_of_windows; w++)
+            if (benchmark_mode != 0)
             {
-                consensus_lengths_s[w] = consensus_s[w].length();
-                sum_consensus_length_s += consensus_lengths_s[w];
+                for (int w = 0; w < number_of_windows; w++)
+                {
+                    consensus_lengths_s[w] = consensus_s[w].length();
+                    sum_consensus_length_s += consensus_lengths_s[w];
+                }
             }
-            std::cerr << "SPOA " << std::left << std::setw(17) << sum_consensus_length_s/number_of_windows;
+
+            if (verbose)
+            {
+                float similarity_percentage;
+                for (int w = 0; w < number_of_windows; w++)
+                {
+                    std::cerr << "Consensus length for window " << std::left << std::setw(5) << w + 1 << "  cudaPOA " << std::left << std::setw(22);
+                    if (benchmark_mode == 1)
+                        std::cerr << "NA";
+                    else
+                        std::cerr << consensus_lengths_c[w];
+                    if (benchmark_mode == 0)
+                        std::cerr << "SPOA NA";
+                    else
+                        std::cerr << "SPOA " << std::left << std::setw(17) << consensus_lengths_s[w];
+                    if (benchmark_mode == 2)
+                    {
+                        similarity_percentage = 100.0f * (1.0f - (float)abs(consensus_lengths_c[w] - consensus_lengths_s[w]) / (float)consensus_lengths_s[w]);
+                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar";
+                    }
+                    std::cerr << std::endl;
+                }
+            }
+            else
+            {
+                std::cerr << "Average consensus length:          cudaPOA " << std::left << std::setw(22);
+                if (benchmark_mode == 1)
+                    std::cerr << "NA";
+                else
+                    std::cerr << sum_consensus_length_c / number_of_windows;
+                if (benchmark_mode == 0)
+                    std::cerr << "SPOA NA";
+                else
+                    std::cerr << "SPOA " << std::left << std::setw(17) << sum_consensus_length_s / number_of_windows;
+                if (benchmark_mode == 2)
+                {
+                    float similarity_percentage = 100.0f * (1.0f - (float)abs(sum_consensus_length_c - sum_consensus_length_s) / (float)sum_consensus_length_s);
+                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar";
+                }
+                std::cerr << std::endl;
+            }
         }
-        if (benchmark_mode == 2 && !msa_flag)
-        {
-            float diff = 100.0f * (float)abs(sum_consensus_length_s - sum_consensus_length_c) / (float)sum_consensus_length_s;
-            std::cerr << std::fixed << std::setprecision(0) << (100 - diff) << "% similar";
-        }
-        std::cerr << "\n=========================================================================================================\n\n";
+        std::cerr << "=========================================================================================================\n\n";
     }
 
     return 0;
