@@ -73,15 +73,16 @@ void process_batch(Batch* batch, bool msa_flag, bool print,
     if (msa_flag)
     {
         // Grab MSA results for all POA groups in batch.
-        std::vector<StatusType> output_status; // Status of MSA generation per group
+        std::vector<std::vector<std::string>> msa_local; // MSA per group
+        std::vector<StatusType> output_status;           // Status of MSA generation per group
 
-        status = batch->get_msa(msa, output_status);
+        status = batch->get_msa(msa_local, output_status);
         if (status != StatusType::success)
         {
             std::cerr << "Could not generate MSA for batch : " << status << std::endl;
         }
 
-        for (int32_t g = 0; g < get_size(msa); g++)
+        for (int32_t g = 0; g < get_size(msa_local); g++)
         {
             if (output_status[g] != StatusType::success)
             {
@@ -91,26 +92,30 @@ void process_batch(Batch* batch, bool msa_flag, bool print,
             {
                 if (print)
                 {
-                    for (const auto& alignment : msa[g])
+                    for (const auto& alignment : msa_local[g])
                     {
                         std::cout << alignment << std::endl;
                     }
                 }
             }
         }
+
+        msa.insert(msa.end(), msa_local.begin(), msa_local.end());
     }
     else
     {
         // Grab consensus results for all POA groups in batch
+        std::vector<std::string> consensus_local;
+        std::vector<std::vector<uint16_t>> coverage_local;
         std::vector<StatusType> output_status; // Status of consensus generation per group
 
-        status = batch->get_consensus(consensus, coverage, output_status);
+        status = batch->get_consensus(consensus_local, coverage_local, output_status);
         if (status != StatusType::success)
         {
             std::cerr << "Could not generate consensus for batch : " << status << std::endl;
         }
 
-        for (int32_t g = 0; g < get_size(consensus); g++)
+        for (int32_t g = 0; g < get_size(consensus_local); g++)
         {
             if (output_status[g] != StatusType::success)
             {
@@ -120,10 +125,13 @@ void process_batch(Batch* batch, bool msa_flag, bool print,
             {
                 if (print)
                 {
-                    std::cout << consensus[g] << std::endl;
+                    std::cout << consensus_local[g] << std::endl;
                 }
             }
         }
+
+        consensus.insert(consensus.end(), consensus_local.begin(), consensus_local.end());
+        coverage.insert(coverage.end(), coverage_local.begin(), coverage_local.end());
     }
 }
 
@@ -145,7 +153,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
     if (msa_flag)
     {
         // Grab MSA results for all groups within the range
-        msa.resize(end_id - start_id); // MSA per group
+        std::vector<std::vector<std::string>> msa_local(end_id - start_id); // MSA per group
 
         for (int32_t g = start_id; g < end_id; g++)
         {
@@ -154,28 +162,30 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
                 auto alignment = alignment_engine->align(it, graph);
                 graph->add_alignment(alignment, it);
             }
-            graph->generate_multiple_sequence_alignment(msa[g - start_id]);
+            graph->generate_multiple_sequence_alignment(msa_local[g - start_id]);
         }
 
         if (print)
         {
             std::cout << std::endl;
-            for (int32_t i = 0; i < get_size(msa); i++)
+            for (int32_t i = 0; i < get_size(msa_local); i++)
             {
                 {
-                    for (const auto& alignment : msa[i])
+                    for (const auto& alignment : msa_local[i])
                     {
                         std::cout << alignment << std::endl;
                     }
                 }
             }
         }
+
+        msa.insert(msa.end(), msa_local.begin(), msa_local.end());
     }
     else
     {
         // Grab consensus results for all POA groups within the range
-        consensus.resize(end_id - start_id); // Consensus string for each POA group
-        coverage.resize(end_id - start_id);  // Per base coverage for each consensus
+        std::vector<std::string> consensus_local(end_id - start_id);          // Consensus string for each POA group
+        std::vector<std::vector<uint32_t>> coverage_local(end_id - start_id); // Per base coverage for each consensus
 
         for (int32_t g = start_id; g < end_id; g++)
         {
@@ -184,17 +194,20 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
                 auto alignment = alignment_engine->align(it, graph);
                 graph->add_alignment(alignment, it);
             }
-            consensus[g - start_id] = graph->generate_consensus(coverage[g - start_id]);
+            consensus_local[g - start_id] = graph->generate_consensus(coverage_local[g - start_id]);
         }
 
         if (print)
         {
             std::cout << std::endl;
-            for (int32_t i = 0; i < get_size(consensus); i++)
+            for (int32_t i = 0; i < get_size(consensus_local); i++)
             {
-                std::cout << consensus[i] << std::endl;
+                std::cout << consensus_local[i] << std::endl;
             }
         }
+
+        consensus.insert(consensus.end(), consensus_local.begin(), consensus_local.end());
+        coverage.insert(coverage.end(), coverage_local.begin(), coverage_local.end());
     }
 }
 
