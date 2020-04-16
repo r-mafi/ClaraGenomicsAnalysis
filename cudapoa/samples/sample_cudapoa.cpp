@@ -516,6 +516,7 @@ int main(int argc, char** argv)
         }
     }
 
+    // print benchmarking report
     if (benchmark)
     {
         std::cerr << "\nbenchmark summary:\n";
@@ -584,7 +585,6 @@ int main(int argc, char** argv)
             std::vector<int32_t> consensus_lengths_s(number_of_windows);
             int32_t sum_consensus_length_c = 0;
             int32_t sum_consensus_length_s = 0;
-            int32_t sum_abs_diff           = 0;
             if (benchmark_mode != 1)
             {
                 for (int w = 0; w < number_of_windows; w++)
@@ -643,6 +643,74 @@ int main(int argc, char** argv)
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar";
                 }
                 std::cerr << std::endl;
+            }
+            if(verbose && benchmark_mode == 2)
+            {
+                std::cerr << "---------------------------------------------------------------------------------------------------------\n";
+                auto max_length = batch_size.max_concensus_size;
+                batch_size = BatchSize(max_length, 2);
+                std::unique_ptr<Batch> benchmark_batch = initialize_batch(true, batch_size, false);
+
+                StatusType status;
+                std::vector<StatusType> status_vec;
+                for (int w = 0; w < number_of_windows; w++)
+                {
+                    Group poa_group;
+                    // Create a new entry for each consensus sequence from spoa and cudapoa and add to the group
+                    Entry poa_entry_s{};
+                    poa_entry_s.seq     = consensus_s[w].c_str();
+                    poa_entry_s.length  = consensus_lengths_s[w];
+                    poa_entry_s.weights = nullptr;
+                    poa_group.push_back(poa_entry_s);
+                    Entry poa_entry_c{};
+                    poa_entry_c.seq     = consensus_c[w].c_str();
+                    poa_entry_c.length  = consensus_lengths_c[w];
+                    poa_entry_c.weights = nullptr;
+                    poa_group.push_back(poa_entry_c);
+                    status = benchmark_batch->add_poa_group(status_vec, poa_group);
+                    if (status != StatusType::success)
+                    {
+                        std::cerr << "Failed to add poa for window " << w + 1 << "!\n";
+                        assert(false);
+                    }
+                }
+
+                std::vector<std::vector<std::string>> benchmark_msa;
+                status_vec.clear();
+                benchmark_batch.get()->generate_poa();
+                benchmark_batch.get()->get_msa(benchmark_msa, status_vec);
+
+                for (int32_t g = 0; g < get_size(benchmark_msa); g++)
+                {
+                    if (status_vec[g] != StatusType::success)
+                    {
+                        std::cerr << "Error generating  MSA for POA group " << g << ". Error type " << status_vec[g] << std::endl;
+                    }
+                    else
+                    {
+                        int32_t insert_cntr = 0;
+                        int32_t delete_cntr = 0;
+                        int32_t mismatch_cntr = 0;
+
+                        const auto& target = benchmark_msa[g][0];
+                        const auto& query  = benchmark_msa[g][1];
+                        assert(target.length() == query.length());
+                        for(int32_t i = 0; i < target.length(); i++)
+                        {
+                            if (target[i] == '-')
+                                insert_cntr ++;
+                            else if (query[i] == '-')
+                                delete_cntr++;
+                            else if (target[i]!=query[i])
+                                mismatch_cntr++;
+                        }
+
+                        int width = g < 9 ? 6 : g < 99 ? 5 : 4;
+                        std::cerr << "Differences for window      " << g+1 << std::left << std::setw(width) << ":";
+                        std::cerr << "inserts " << std::left << std::setw(22) << insert_cntr;
+                        std::cerr << "deletes " << std::left << std::setw(17) << delete_cntr << "mismatches " << mismatch_cntr << std::endl;
+                    }
+                }
             }
         }
         std::cerr << "=========================================================================================================\n\n";
