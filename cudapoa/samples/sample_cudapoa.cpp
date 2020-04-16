@@ -163,6 +163,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
                 graph->add_alignment(alignment, it);
             }
             graph->generate_multiple_sequence_alignment(msa_local[g - start_id]);
+            graph->clear();
         }
 
         if (print)
@@ -195,6 +196,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
                 graph->add_alignment(alignment, it);
             }
             consensus_local[g - start_id] = graph->generate_consensus(coverage_local[g - start_id]);
+            graph->clear();
         }
 
         if (print)
