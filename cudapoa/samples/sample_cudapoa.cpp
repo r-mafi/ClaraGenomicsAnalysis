@@ -690,11 +690,13 @@ int main(int argc, char** argv)
 
                     if (status == StatusType::exceeded_maximum_poas || status == StatusType::exceeded_batch_size || (i == number_of_windows - 1))
                     {
+                        std::vector<std::vector<std::string>> temp_msa;
                         // no more POA groups can be added to batch. Now process batch
                         benchmark_batch.get()->generate_poa();
-                        benchmark_batch.get()->get_msa(benchmark_msa, status_msa);
+                        benchmark_batch.get()->get_msa(temp_msa, status_msa);
                         // after MSA is generated for benchmark_batch, reset benchmark_batch to make room for next set of POA groups.
                         benchmark_batch->reset();
+                        benchmark_msa.insert(benchmark_msa.end(), temp_msa.begin(), temp_msa.end());
                     }
 
                     if (status == StatusType::success)
