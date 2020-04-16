@@ -648,45 +648,57 @@ int main(int argc, char** argv)
             {
                 std::cerr << "---------------------------------------------------------------------------------------------------------\n";
                 batch.reset(); //delete original batch object to free up memory on GPU for MSA on outputs of cudaPOA and SPOA
-
-                auto max_length                        = batch_size.max_concensus_size;
+                auto it_c                              = std::max(consensus_lengths_c.begin(), consensus_lengths_c.end());
+                auto it_s                              = std::max(consensus_lengths_s.begin(), consensus_lengths_s.end());
+                int32_t max_length                     = std::max(*it_c, *it_s) + 1;
                 batch_size                             = BatchSize(max_length, 2);
                 std::unique_ptr<Batch> benchmark_batch = initialize_batch(true, batch_size, false);
 
+                std::vector<std::vector<std::string>> benchmark_msa;
                 StatusType status;
-                std::vector<StatusType> status_vec;
-                for (int w = 0; w < number_of_windows; w++)
+                std::vector<StatusType> status_msa, status_add;
+                for (int i = 0; i < number_of_windows;)
                 {
                     Group poa_group;
                     // Create a new entry for each consensus sequence from spoa and cudapoa and add to the group
                     Entry poa_entry_s{};
-                    poa_entry_s.seq     = consensus_s[w].c_str();
-                    poa_entry_s.length  = consensus_lengths_s[w];
+                    poa_entry_s.seq     = consensus_s[i].c_str();
+                    poa_entry_s.length  = consensus_lengths_s[i];
                     poa_entry_s.weights = nullptr;
                     poa_group.push_back(poa_entry_s);
                     Entry poa_entry_c{};
-                    poa_entry_c.seq     = consensus_c[w].c_str();
-                    poa_entry_c.length  = consensus_lengths_c[w];
+                    poa_entry_c.seq     = consensus_c[i].c_str();
+                    poa_entry_c.length  = consensus_lengths_c[i];
                     poa_entry_c.weights = nullptr;
                     poa_group.push_back(poa_entry_c);
-                    status = benchmark_batch->add_poa_group(status_vec, poa_group);
-                    if (status != StatusType::success)
+                    status = benchmark_batch->add_poa_group(status_add, poa_group);
+
+                    if (status == StatusType::exceeded_maximum_poas || status == StatusType::exceeded_batch_size || (i == number_of_windows - 1))
                     {
-                        std::cerr << "Failed to add poa for window " << w + 1 << " Error type " << status << std::endl;
-                        assert(false);
+                        // no more POA groups can be added to batch. Now process batch
+                        benchmark_batch.get()->generate_poa();
+                        benchmark_batch.get()->get_msa(benchmark_msa, status_msa);
+                        // after MSA is generated for benchmark_batch, reset benchmark_batch to make room for next set of POA groups.
+                        benchmark_batch->reset();
+                    }
+
+                    if (status == StatusType::success)
+                    {
+                        i++;
+                    }
+                    else if (status != StatusType::exceeded_maximum_poas && status != StatusType::exceeded_batch_size)
+                    {
+                        std::cerr << "Could not add POA group to batch. Error code " << status << std::endl;
+                        i++;
                     }
                 }
 
-                std::vector<std::vector<std::string>> benchmark_msa;
-                status_vec.clear();
-                benchmark_batch.get()->generate_poa();
-                benchmark_batch.get()->get_msa(benchmark_msa, status_vec);
-
+                // print comparison details between cudaPOA and SPOA consensus per window
                 for (int32_t g = 0; g < get_size(benchmark_msa); g++)
                 {
-                    if (status_vec[g] != StatusType::success)
+                    if (status_msa[g] != StatusType::success)
                     {
-                        std::cerr << "Error generating  MSA for POA group " << g << ". Error type " << status_vec[g] << std::endl;
+                        std::cerr << "Error generating  MSA for POA group " << g << ". Error type " << status_msa[g] << std::endl;
                     }
                     else
                     {
