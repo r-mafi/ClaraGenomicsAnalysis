@@ -521,16 +521,16 @@ int main(int argc, char** argv)
     {
         std::cerr << "\nbenchmark summary:\n";
         std::cerr << "=========================================================================================================\n";
-        std::cerr << "Number of windows(W) " << std::left << std::setw(14) << std::setfill(' ') << number_of_windows;
-        std::cerr << "Sequence length(S) " << std::left << std::setw(11) << std::setfill(' ') << sequence_size;
-        std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << std::setfill(' ') << group_size << std::endl;
+        std::cerr << "Number of windows(W) " << std::left << std::setw(14) << std::fixed << number_of_windows;
+        std::cerr << "Sequence length(S) " << std::left << std::setw(9) << std::fixed << sequence_size;
+        std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << group_size << std::endl;
         std::cerr << "Banded alignment for cudaPOA:      ";
         if (banded)
             std::cerr << "ON\n";
         else
             std::cerr << "OFF\n";
         std::cerr << "---------------------------------------------------------------------------------------------------------\n";
-        std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(22);
+        std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(20);
         if (benchmark_mode == 1)
             std::cerr << "NA";
         else
@@ -543,7 +543,7 @@ int main(int argc, char** argv)
         std::cerr << "---------------------------------------------------------------------------------------------------------\n";
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
         std::cerr << "Expected performance (bases/sec) : cudaPOA ";
-        std::cerr << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
+        std::cerr << std::left << std::setw(20) << std::fixed << std::setprecision(2) << std::scientific;
         if (benchmark_mode == 1)
             std::cerr << "NA";
         else
@@ -562,7 +562,7 @@ int main(int argc, char** argv)
         }
         float effective_perf_cupoa = (float)actual_number_of_bases / cudapoa_time;
         float effective_perf_spoa  = (float)actual_number_of_bases / spoa_time;
-        std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(22) << std::fixed << std::setprecision(2) << std::scientific;
+        std::cerr << "Effective performance (bases/sec): cudaPOA " << std::left << std::setw(20) << std::fixed << std::setprecision(2) << std::scientific;
         if (benchmark_mode == 1)
             std::cerr << "NA";
         else
@@ -570,7 +570,7 @@ int main(int argc, char** argv)
         if (benchmark_mode == 0)
             std::cerr << "SPOA NA";
         else
-            std::cerr << "SPOA " << std::left << std::setw(17) << effective_perf_spoa;
+            std::cerr << "SPOA " << std::left << std::setw(20) << effective_perf_spoa;
         if (benchmark_mode == 2)
         {
             if (effective_perf_cupoa > effective_perf_spoa)
@@ -609,7 +609,7 @@ int main(int argc, char** argv)
                 {
                     int width = w < 9 ? 4 : w < 99 ? 3 : 2;
                     std::cerr << "Consensus length for window " << w + 1 << std::left << std::setw(width) << ":"
-                              << "  cudaPOA " << std::left << std::setw(22);
+                              << "  cudaPOA " << std::left << std::setw(20);
                     if (benchmark_mode == 1)
                         std::cerr << "NA";
                     else
@@ -617,7 +617,7 @@ int main(int argc, char** argv)
                     if (benchmark_mode == 0)
                         std::cerr << "SPOA NA";
                     else
-                        std::cerr << "SPOA " << std::left << std::setw(17) << consensus_lengths_s[w];
+                        std::cerr << "SPOA " << std::left << std::setw(20) << consensus_lengths_s[w];
                     if (benchmark_mode == 2)
                     {
                         similarity_percentage = 100.0f * (1.0f - (float)abs(consensus_lengths_c[w] - consensus_lengths_s[w]) / (float)consensus_lengths_s[w]);
@@ -628,7 +628,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                std::cerr << "Average consensus length:          cudaPOA " << std::left << std::setw(22);
+                std::cerr << "Average consensus length:          cudaPOA " << std::left << std::setw(20);
                 if (benchmark_mode == 1)
                     std::cerr << "NA";
                 else
@@ -636,7 +636,7 @@ int main(int argc, char** argv)
                 if (benchmark_mode == 0)
                     std::cerr << "SPOA NA";
                 else
-                    std::cerr << "SPOA " << std::left << std::setw(17) << sum_consensus_length_s / number_of_windows;
+                    std::cerr << "SPOA " << std::left << std::setw(20) << sum_consensus_length_s / number_of_windows;
                 if (benchmark_mode == 2)
                 {
                     float similarity_percentage = 100.0f * (1.0f - (float)abs(sum_consensus_length_c - sum_consensus_length_s) / (float)sum_consensus_length_s);
@@ -644,11 +644,13 @@ int main(int argc, char** argv)
                 }
                 std::cerr << std::endl;
             }
-            if(verbose && benchmark_mode == 2)
+            if (verbose && benchmark_mode == 2)
             {
                 std::cerr << "---------------------------------------------------------------------------------------------------------\n";
-                auto max_length = batch_size.max_concensus_size;
-                batch_size = BatchSize(max_length, 2);
+                batch.reset(); //delete original batch object to free up memory on GPU for MSA on outputs of cudaPOA and SPOA
+
+                auto max_length                        = batch_size.max_concensus_size;
+                batch_size                             = BatchSize(max_length, 2);
                 std::unique_ptr<Batch> benchmark_batch = initialize_batch(true, batch_size, false);
 
                 StatusType status;
@@ -670,7 +672,7 @@ int main(int argc, char** argv)
                     status = benchmark_batch->add_poa_group(status_vec, poa_group);
                     if (status != StatusType::success)
                     {
-                        std::cerr << "Failed to add poa for window " << w + 1 << "!\n";
+                        std::cerr << "Failed to add poa for window " << w + 1 << " Error type " << status << std::endl;
                         assert(false);
                     }
                 }
@@ -688,26 +690,26 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        int32_t insert_cntr = 0;
-                        int32_t delete_cntr = 0;
+                        int32_t insert_cntr   = 0;
+                        int32_t delete_cntr   = 0;
                         int32_t mismatch_cntr = 0;
 
                         const auto& target = benchmark_msa[g][0];
                         const auto& query  = benchmark_msa[g][1];
                         assert(target.length() == query.length());
-                        for(int32_t i = 0; i < target.length(); i++)
+                        for (int32_t i = 0; i < target.length(); i++)
                         {
                             if (target[i] == '-')
-                                insert_cntr ++;
+                                insert_cntr++;
                             else if (query[i] == '-')
                                 delete_cntr++;
-                            else if (target[i]!=query[i])
+                            else if (target[i] != query[i])
                                 mismatch_cntr++;
                         }
 
                         int width = g < 9 ? 6 : g < 99 ? 5 : 4;
-                        std::cerr << "Differences for window      " << g+1 << std::left << std::setw(width) << ":";
-                        std::cerr << "inserts " << std::left << std::setw(22) << insert_cntr;
+                        std::cerr << "Differences for window      " << g + 1 << std::left << std::setw(width) << ":";
+                        std::cerr << "inserts " << std::left << std::setw(20) << insert_cntr;
                         std::cerr << "deletes " << std::left << std::setw(17) << delete_cntr << "mismatches " << mismatch_cntr << std::endl;
                     }
                 }
