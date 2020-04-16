@@ -661,8 +661,8 @@ int main(int argc, char** argv)
             {
                 std::cerr << "---------------------------------------------------------------------------------------------------------\n";
                 batch.reset(); //delete original batch object to free up memory on GPU for MSA on outputs of cudaPOA and SPOA
-                auto it_c                              = std::max(consensus_lengths_c.begin(), consensus_lengths_c.end());
-                auto it_s                              = std::max(consensus_lengths_s.begin(), consensus_lengths_s.end());
+                auto it_c                              = std::max_element(consensus_lengths_c.begin(), consensus_lengths_c.end());
+                auto it_s                              = std::max_element(consensus_lengths_s.begin(), consensus_lengths_s.end());
                 int32_t max_length                     = std::max(*it_c, *it_s) + 1;
                 batch_size                             = BatchSize(max_length, 2);
                 std::unique_ptr<Batch> benchmark_batch = initialize_batch(true, batch_size, false);
