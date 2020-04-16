@@ -217,7 +217,7 @@ void generate_window_data(const std::string& input_file, const int number_of_win
 }
 
 // the following function can create simulated reads in an arbitrary number of windows with given sequence length and POA group size
-void generate_simulated_reads(const uint32_t number_of_windows, const uint32_t sequence_size, const uint32_t group_size,
+void generate_simulated_reads(const uint32_t number_of_windows, const uint32_t sequence_size, const uint32_t max_sequences_per_poa,
                               std::vector<std::vector<std::string>>& windows, BatchSize& batch_size)
 {
     constexpr uint32_t random_seed = 5827349;
@@ -257,11 +257,11 @@ void generate_simulated_reads(const uint32_t number_of_windows, const uint32_t s
         start_idx += step_size;
     }
 
-    std::vector<std::string> long_reads(group_size);
+    std::vector<std::string> long_reads(max_sequences_per_poa);
     for (uint32_t w = 0; w < number_of_windows; w++)
     {
         long_reads[0] = claragenomics::genomeutils::generate_random_genome(sequence_size, rng);
-        for (uint32_t i = 1; i < group_size; i++)
+        for (uint32_t i = 1; i < max_sequences_per_poa; i++)
         {
             long_reads[i]       = claragenomics::genomeutils::generate_random_sequence(long_reads[0], rng, sequence_size, sequence_size, sequence_size, &variation_ranges);
             max_sequence_length = max_sequence_length > get_size(long_reads[i]) ? max_sequence_length : get_size(long_reads[i]) + 1;
@@ -271,7 +271,7 @@ void generate_simulated_reads(const uint32_t number_of_windows, const uint32_t s
     }
 
     // Define upper limits for sequence size, graph size ....
-    batch_size = BatchSize(max_sequence_length, group_size);
+    batch_size = BatchSize(max_sequence_length, max_sequences_per_poa);
 }
 
 int main(int argc, char** argv)
@@ -285,16 +285,16 @@ int main(int argc, char** argv)
     bool print_graph = false;
     bool benchmark   = false;
     bool banded      = false;
-    bool verbose     = false;
-
     // following parameters are used in benchmarking only
     uint32_t number_of_windows = 0;
     uint32_t sequence_size     = 0;
     uint32_t group_size        = 0;
     // benchmark mode 0: runs only cudaPOA, 1: runs only SPOA, 2: runs both (default)
     uint32_t benchmark_mode = 2;
+    // an option to report detailed accuracy metrics per window as opposed to an average value
+    uint32_t verbose = 1;
 
-    while ((c = getopt(argc, argv, "mlhpgbBVW:S:N:M:")) != -1)
+    while ((c = getopt(argc, argv, "mlhpgbBW:S:N:M:V:")) != -1)
     {
         switch (c)
         {
@@ -317,7 +317,7 @@ int main(int argc, char** argv)
             banded = true;
             break;
         case 'V':
-            verbose = true;
+            verbose = atoi(optarg);
             break;
         case 'W':
             number_of_windows = atoi(optarg);
@@ -348,11 +348,11 @@ int main(int argc, char** argv)
         std::cout << "-g : Print POA graph in dot format, this option is only for long-read sample" << std::endl;
         std::cout << "-b : Benchmark against SPOA" << std::endl;
         std::cout << "-B : cudaPOA is computed as banded" << std::endl;
-        std::cout << "-V : Verbose mode, this option is only for benchmark mode. It will output accuracy details per window as opposed to average metrics in benchmark report" << std::endl;
         std::cout << "-W : Number of total windows used in benchmarking" << std::endl;
         std::cout << "-S : Maximum sequence length in benchmarking" << std::endl;
         std::cout << "-N : Number of sequences per POA group" << std::endl;
-        std::cout << "-M : 0, 1, 2. Only used in benchmarking: -M 0, runs only cudaPOA, -M 1, runs only SPOA, -M 2, default, runs both" << std::endl;
+        std::cout << "-M : 0, 1, [2]. Only used in benchmark mode: -M 0, runs only cudaPOA, -M 1, runs only SPOA, -M 2, default, runs both" << std::endl;
+        std::cout << "-V : 0, [1]. Verbose mode, only used in benchmark mode. -V 1, default, will output details per window. -V 0 only reports average metrics among windows." << std::endl;
         std::cout << "-h : Print help message" << std::endl;
         std::exit(0);
     }
@@ -361,6 +361,11 @@ int main(int argc, char** argv)
     number_of_windows = number_of_windows == 0 ? (long_read ? 10 : 1000) : number_of_windows;
     sequence_size     = sequence_size == 0 ? (long_read ? 10000 : 1024) : sequence_size;
     group_size        = group_size == 0 ? (long_read ? 6 : 100) : group_size;
+
+    if (!long_read && group_size < 100)
+    {
+        std::cerr << "choosing small group size for short-read sample can result in lower accuracy in cudaPOA, see argument -- 'N'" << std::endl;
+    }
 
     // Load input data. Each POA group is represented as a vector of strings. The sample
     // data for short reads has many such POA groups to process, hence the data is loaded into a vector
@@ -597,12 +602,14 @@ int main(int argc, char** argv)
                 }
             }
 
-            if (verbose)
+            if (verbose == 1)
             {
                 float similarity_percentage;
                 for (int w = 0; w < number_of_windows; w++)
                 {
-                    std::cerr << "Consensus length for window " << std::left << std::setw(5) << w + 1 << "  cudaPOA " << std::left << std::setw(22);
+                    int width = w < 9 ? 4 : w < 99 ? 3 : 2;
+                    std::cerr << "Consensus length for window " << w + 1 << std::left << std::setw(width) << ":"
+                              << "  cudaPOA " << std::left << std::setw(22);
                     if (benchmark_mode == 1)
                         std::cerr << "NA";
                     else
