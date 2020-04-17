@@ -378,9 +378,12 @@ int main(int argc, char** argv)
     sequence_size     = sequence_size == 0 ? (long_read ? 10000 : 1024) : sequence_size;
     group_size        = group_size == 0 ? (long_read ? 6 : 100) : group_size;
 
-    if (!long_read && group_size < 100)
+    if (!long_read)
     {
-        std::cerr << "choosing small group size for short-read sample can result in lower accuracy in cudaPOA, see argument -- 'N'" << std::endl;
+        if(group_size < 100)
+            std::cerr << "choosing small group size for short-read sample can result in lower accuracy in cudaPOA, see argument -- 'N'" << std::endl;
+        if(sequence_size != 1024)
+            std::cerr << "for short read samples, input maximum sequence length is ignored, see argument -- 'S'" << std::endl;
     }
 
     // Load input data. Each POA group is represented as a vector of strings. The sample
