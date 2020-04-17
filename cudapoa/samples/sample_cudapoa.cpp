@@ -156,7 +156,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
 
         for (int32_t g = start_id; g < end_id; g++)
         {
-            auto graph  = spoa::createGraph();
+            auto graph = spoa::createGraph();
             for (const auto& it : groups[g])
             {
                 auto alignment = alignment_engine->align(it, graph);
@@ -190,7 +190,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
 
         for (int32_t g = start_id; g < end_id; g++)
         {
-            auto graph  = spoa::createGraph();
+            auto graph = spoa::createGraph();
             for (const auto& it : groups[g])
             {
                 auto alignment = alignment_engine->align(it, graph);
@@ -536,7 +536,7 @@ int main(int argc, char** argv)
     if (benchmark)
     {
         std::cerr << "\nbenchmark summary:\n";
-        std::cerr << "=========================================================================================================\n";
+        std::cerr << "=============================================================================================================\n";
         std::cerr << "Number of windows(W) " << std::left << std::setw(14) << std::fixed << number_of_windows;
         std::cerr << "Sequence length(S) " << std::left << std::setw(9) << std::fixed << sequence_size;
         std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << group_size << std::endl;
@@ -545,7 +545,7 @@ int main(int argc, char** argv)
             std::cerr << "ON\n";
         else
             std::cerr << "OFF\n";
-        std::cerr << "---------------------------------------------------------------------------------------------------------\n";
+        std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
         std::cerr << "Compute time (sec):                cudaPOA " << std::left << std::setw(20);
         if (benchmark_mode == 1)
             std::cerr << "NA";
@@ -556,7 +556,7 @@ int main(int argc, char** argv)
             std::cerr << "NA" << std::endl;
         else
             std::cerr << std::fixed << std::setprecision(2) << spoa_time << std::endl;
-        std::cerr << "---------------------------------------------------------------------------------------------------------\n";
+        std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
         int32_t number_of_bases = number_of_windows * sequence_size * group_size;
         std::cerr << "Expected performance (bases/sec) : cudaPOA ";
         std::cerr << std::left << std::setw(20) << std::fixed << std::setprecision(2) << std::scientific;
@@ -594,7 +594,7 @@ int main(int argc, char** argv)
             else
                 std::cerr << "x" << std::fixed << std::setprecision(1) << effective_perf_spoa / effective_perf_cupoa << " slower";
         }
-        std::cerr << "\n---------------------------------------------------------------------------------------------------------\n";
+        std::cerr << "\n-------------------------------------------------------------------------------------------------------------\n";
         if (!msa_flag)
         {
             std::vector<int32_t> consensus_lengths_c(number_of_windows);
@@ -637,7 +637,7 @@ int main(int argc, char** argv)
                     if (benchmark_mode == 2)
                     {
                         similarity_percentage = 100.0f * (1.0f - (float)abs(consensus_lengths_c[w] - consensus_lengths_s[w]) / (float)consensus_lengths_s[w]);
-                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar";
+                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar length";
                     }
                     std::cerr << std::endl;
                 }
@@ -655,14 +655,14 @@ int main(int argc, char** argv)
                     std::cerr << "SPOA " << std::left << std::setw(20) << sum_consensus_length_s / number_of_windows;
                 if (benchmark_mode == 2)
                 {
-                    float similarity_percentage = 100.0f * (1.0f - (float)abs(sum_consensus_length_c - sum_consensus_length_s) / (float)sum_consensus_length_s);
-                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar";
+                    float length_similarity_percentage = 100.0f * (1.0f - (float)abs(sum_consensus_length_c - sum_consensus_length_s) / (float)sum_consensus_length_s);
+                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << length_similarity_percentage << "% similar length";
                 }
                 std::cerr << std::endl;
             }
             if (verbose && benchmark_mode == 2)
             {
-                std::cerr << "---------------------------------------------------------------------------------------------------------\n";
+                std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
                 batch.reset(); //delete original batch object to free up memory on GPU for MSA on outputs of cudaPOA and SPOA
                 auto it_c                              = std::max_element(consensus_lengths_c.begin(), consensus_lengths_c.end());
                 auto it_s                              = std::max_element(consensus_lengths_s.begin(), consensus_lengths_s.end());
@@ -737,15 +737,18 @@ int main(int argc, char** argv)
                                 mismatch_cntr++;
                         }
 
+                        float identity_percentage = 100.0f * (1.0f - (float)(insert_cntr + delete_cntr + mismatch_cntr) / (float)(std::min(consensus_lengths_s[g], consensus_lengths_c[g])));
+
                         int width = g < 9 ? 6 : g < 99 ? 5 : 4;
                         std::cerr << "Differences for window      " << g + 1 << std::left << std::setw(width) << ":";
-                        std::cerr << "inserts " << std::left << std::setw(20) << insert_cntr;
-                        std::cerr << "deletes " << std::left << std::setw(17) << delete_cntr << "mismatches " << mismatch_cntr << std::endl;
+                        std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(15) << delete_cntr;
+                        std::cerr << "mismatches " << std::left << std::setw(14) << mismatch_cntr;
+                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
                     }
                 }
             }
         }
-        std::cerr << "=========================================================================================================\n\n";
+        std::cerr << "=============================================================================================================\n\n";
     }
 
     return 0;
