@@ -726,6 +726,7 @@ int main(int argc, char** argv)
                         int32_t insert_cntr   = 0;
                         int32_t delete_cntr   = 0;
                         int32_t mismatch_cntr = 0;
+                        int32_t identity_cntr = 0;
 
                         const auto& target = benchmark_msa[g][0];
                         const auto& query  = benchmark_msa[g][1];
@@ -738,9 +739,11 @@ int main(int argc, char** argv)
                                 delete_cntr++;
                             else if (target[i] != query[i])
                                 mismatch_cntr++;
+                            else /*target[i] == query[i]*/
+                                identity_cntr++;
                         }
 
-                        float identity_percentage = 100.0f * (1.0f - (float)(insert_cntr + delete_cntr + mismatch_cntr) / (float)(std::min(consensus_lengths_s[g], consensus_lengths_c[g])));
+                        float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_s[g], consensus_lengths_c[g]));
 
                         int width = g < 9 ? 6 : g < 99 ? 5 : 4;
                         std::cerr << "Differences for window      " << g + 1 << std::left << std::setw(width) << ":";
