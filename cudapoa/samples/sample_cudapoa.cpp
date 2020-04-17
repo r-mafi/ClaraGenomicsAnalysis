@@ -148,7 +148,6 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
     int gap_score             = -8;
 
     auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
-    auto graph            = spoa::createGraph();
 
     if (msa_flag)
     {
@@ -157,6 +156,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
 
         for (int32_t g = start_id; g < end_id; g++)
         {
+            auto graph  = spoa::createGraph();
             for (const auto& it : groups[g])
             {
                 auto alignment = alignment_engine->align(it, graph);
@@ -190,6 +190,7 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
 
         for (int32_t g = start_id; g < end_id; g++)
         {
+            auto graph  = spoa::createGraph();
             for (const auto& it : groups[g])
             {
                 auto alignment = alignment_engine->align(it, graph);
