@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <random>
 #include <iomanip>
+#include <omp.h>
 
 using namespace claragenomics;
 using namespace claragenomics::cudapoa;
@@ -147,15 +148,16 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
     int mismatch_score        = -6;
     int gap_score             = -8;
 
-    auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
-
     if (msa_flag)
     {
+        
         // Grab MSA results for all groups within the range
         std::vector<std::vector<std::string>> msa_local(end_id - start_id); // MSA per group
 
+        #pragma omp parallel for num_threads(6)
         for (int32_t g = start_id; g < end_id; g++)
         {
+            auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
             auto graph = spoa::createGraph();
             for (const auto& it : groups[g])
             {
@@ -187,9 +189,11 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
         // Grab consensus results for all POA groups within the range
         std::vector<std::string> consensus_local(end_id - start_id);          // Consensus string for each POA group
         std::vector<std::vector<uint32_t>> coverage_local(end_id - start_id); // Per base coverage for each consensus
-
+        
+        #pragma omp parallel for num_threads(6)
         for (int32_t g = start_id; g < end_id; g++)
         {
+            auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
             auto graph = spoa::createGraph();
             for (const auto& it : groups[g])
             {
@@ -198,7 +202,10 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
             }
             consensus_local[g - start_id] = graph->generate_consensus(coverage_local[g - start_id]);
             graph->clear();
+            
         }
+
+       
 
         if (print)
         {
