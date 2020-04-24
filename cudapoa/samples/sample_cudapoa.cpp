@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <random>
 #include <iomanip>
+#include <omp.h>
 
 using namespace claragenomics;
 using namespace claragenomics::cudapoa;
@@ -136,7 +137,7 @@ void process_batch(Batch* batch, bool msa_flag, bool print,
 }
 
 void spoa_compute(const std::vector<std::vector<std::string>>& groups,
-                  const int32_t start_id, const int32_t end_id,
+                  const int32_t start_id, const int32_t end_id, const int32_t number_of_threads,
                   bool msa_flag, bool print,
                   std::vector<std::vector<std::string>>& msa,
                   std::vector<std::string>& consensus,
@@ -147,16 +148,17 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
     int mismatch_score        = -6;
     int gap_score             = -8;
 
-    auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
-
     if (msa_flag)
     {
+
         // Grab MSA results for all groups within the range
         std::vector<std::vector<std::string>> msa_local(end_id - start_id); // MSA per group
 
+#pragma omp parallel for num_threads(number_of_threads)
         for (int32_t g = start_id; g < end_id; g++)
         {
-            auto graph = spoa::createGraph();
+            auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
+            auto graph            = spoa::createGraph();
             for (const auto& it : groups[g])
             {
                 auto alignment = alignment_engine->align(it, graph);
@@ -188,9 +190,11 @@ void spoa_compute(const std::vector<std::vector<std::string>>& groups,
         std::vector<std::string> consensus_local(end_id - start_id);          // Consensus string for each POA group
         std::vector<std::vector<uint32_t>> coverage_local(end_id - start_id); // Per base coverage for each consensus
 
+#pragma omp parallel for num_threads(number_of_threads)
         for (int32_t g = start_id; g < end_id; g++)
         {
-            auto graph = spoa::createGraph();
+            auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
+            auto graph            = spoa::createGraph();
             for (const auto& it : groups[g])
             {
                 auto alignment = alignment_engine->align(it, graph);
@@ -305,12 +309,13 @@ int main(int argc, char** argv)
     uint32_t number_of_windows = 0;
     uint32_t sequence_size     = 0;
     uint32_t group_size        = 0;
+    int32_t number_of_threads  = 0;
     // benchmark mode 0: runs only cudaPOA, 1: runs only SPOA, 2: runs both (default)
     uint32_t benchmark_mode = 2;
     // an option to report detailed accuracy metrics per window as opposed to an average value
     uint32_t verbose = 1;
 
-    while ((c = getopt(argc, argv, "mlhpgbBW:S:N:M:V:")) != -1)
+    while ((c = getopt(argc, argv, "mlhpgbBW:S:t:N:M:V:")) != -1)
     {
         switch (c)
         {
@@ -341,6 +346,9 @@ int main(int argc, char** argv)
         case 'S':
             sequence_size = atoi(optarg);
             break;
+        case 't':
+            number_of_threads = atoi(optarg);
+            break;
         case 'N':
             group_size = atoi(optarg);
             break;
@@ -366,6 +374,7 @@ int main(int argc, char** argv)
         std::cout << "-B : cudaPOA is computed as banded" << std::endl;
         std::cout << "-W : Number of total windows used in benchmarking" << std::endl;
         std::cout << "-S : Maximum sequence length in benchmarking" << std::endl;
+        std::cout << "-t : Maximum number of threads used in SPOA benchmarking (if not provided, will default to number of logical CPUs)" << std::endl;
         std::cout << "-N : Number of sequences per POA group" << std::endl;
         std::cout << "-M : 0, 1, [2]. Only used in benchmark mode: -M 0, runs only cudaPOA, -M 1, runs only SPOA, -M 2, default, runs both" << std::endl;
         std::cout << "-V : 0, [1]. Verbose mode, only used in benchmark mode. -V 1, default, will output details per window. -V 0 only reports average metrics among windows." << std::endl;
@@ -377,12 +386,19 @@ int main(int argc, char** argv)
     number_of_windows = number_of_windows == 0 ? (long_read ? 10 : 1000) : number_of_windows;
     sequence_size     = sequence_size == 0 ? (long_read ? 10000 : 1024) : sequence_size;
     group_size        = group_size == 0 ? (long_read ? 6 : 100) : group_size;
+    number_of_threads = number_of_threads == 0 ? (int32_t)omp_get_num_procs() : number_of_threads;
+
+    if (benchmark && number_of_threads < 1)
+    {
+        std::cerr << "invalid number of threads. continuing benchmarking with 1 thread, see argument -- 't'" << std::endl;
+        number_of_threads = 1;
+    }
 
     if (!long_read)
     {
-        if(group_size < 100)
+        if (group_size < 100)
             std::cerr << "choosing small group size for short-read sample can result in lower accuracy in cudaPOA, see argument -- 'N'" << std::endl;
-        if(sequence_size != 1024)
+        if (sequence_size != 1024)
             std::cerr << "for short read samples, input maximum sequence length is ignored, see argument -- 'S'" << std::endl;
     }
 
@@ -475,7 +491,7 @@ int main(int argc, char** argv)
                 if (benchmark_mode != 0)
                 {
                     timer.start_timer();
-                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), msa_flag, print, msa_s, consensus_s, coverage_s);
+                    spoa_compute(windows, window_count, window_count + batch->get_total_poas(), number_of_threads, msa_flag, print, msa_s, consensus_s, coverage_s);
                     spoa_time += timer.stop_timer();
                 }
             }
@@ -543,6 +559,7 @@ int main(int argc, char** argv)
         std::cerr << "Number of windows(W) " << std::left << std::setw(14) << std::fixed << number_of_windows;
         std::cerr << "Sequence length(S) " << std::left << std::setw(9) << std::fixed << sequence_size;
         std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << group_size << std::endl;
+        std::cerr << "Number of threads(t) " << std::left << std::setw(14) << std::fixed << number_of_threads;
         std::cerr << "Banded alignment for cudaPOA:      ";
         if (banded)
             std::cerr << "ON\n";
