@@ -227,9 +227,16 @@ void generate_window_data(const std::string& input_file, const int number_of_win
     int32_t max_read_length = 0;
     for (auto& window : windows)
     {
+        int n = 0;
         for (auto& seq : window)
         {
+            n++;
             max_read_length = std::max(max_read_length, get_size<int>(seq) + 1);
+            if (n >= max_sequences_per_poa)
+            {
+                window.erase(window.begin() + n, window.end());
+                break;
+            }
         }
     }
 
@@ -401,8 +408,6 @@ int main(int argc, char** argv)
 
     if (!long_read)
     {
-        if (group_size < 100)
-            std::cerr << "choosing small group size for short-read sample can result in lower accuracy in cudaPOA, see argument -- 'N'" << std::endl;
         if (sequence_size != 1024)
             std::cerr << "for short read samples, input maximum sequence length is ignored, see argument -- 'S'" << std::endl;
     }
@@ -419,7 +424,7 @@ int main(int argc, char** argv)
     {
         if (long_read)
         {
-            if(bonito)
+            if (bonito)
             {
                 const std::string input_file = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-bonito.txt";
                 generate_window_data(input_file, number_of_windows, group_size, windows, batch_size);
@@ -574,14 +579,15 @@ int main(int argc, char** argv)
         std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << group_size << std::endl;
         std::cerr << "Number of threads(t) " << std::left << std::setw(14) << std::fixed << number_of_threads;
         std::cerr << "Dataset " << std::left << std::setw(20) << std::fixed;
-        if(long_read)
+        if (long_read)
         {
-            if(bonito)
+            if (bonito)
                 std::cerr << " bonito";
             else
                 std::cerr << " simulated";
         }
-        else {
+        else
+        {
             std::cerr << " short";
         }
         std::cerr << "Banded alignment for cudaPOA      ";
