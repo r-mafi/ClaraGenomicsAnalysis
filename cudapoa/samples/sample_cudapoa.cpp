@@ -305,6 +305,7 @@ int main(int argc, char** argv)
     bool print_graph = false;
     bool benchmark   = false;
     bool banded      = false;
+    bool bonito      = true;
     // following parameters are used in benchmarking only
     uint32_t number_of_windows = 0;
     uint32_t sequence_size     = 0;
@@ -315,7 +316,7 @@ int main(int argc, char** argv)
     // an option to report detailed accuracy metrics per window as opposed to an average value
     uint32_t verbose = 1;
 
-    while ((c = getopt(argc, argv, "mlhpgbBW:S:t:N:M:V:")) != -1)
+    while ((c = getopt(argc, argv, "mlhpgbBRW:S:t:N:M:V:")) != -1)
     {
         switch (c)
         {
@@ -336,6 +337,9 @@ int main(int argc, char** argv)
             break;
         case 'B':
             banded = true;
+            break;
+        case 'R':
+            bonito = false;
             break;
         case 'V':
             verbose = atoi(optarg);
@@ -371,11 +375,12 @@ int main(int argc, char** argv)
         std::cout << "-p : Print the MSA or consensus output to stdout" << std::endl;
         std::cout << "-g : Print POA graph in dot format, this option is only for long-read sample" << std::endl;
         std::cout << "-b : Benchmark against SPOA" << std::endl;
+        std::cout << "-t : Maximum number of threads used in SPOA benchmarking (if not provided, will default to number of logical CPUs)" << std::endl;
         std::cout << "-B : cudaPOA is computed as banded" << std::endl;
         std::cout << "-W : Number of total windows used in benchmarking" << std::endl;
         std::cout << "-S : Maximum sequence length in benchmarking" << std::endl;
-        std::cout << "-t : Maximum number of threads used in SPOA benchmarking (if not provided, will default to number of logical CPUs)" << std::endl;
         std::cout << "-N : Number of sequences per POA group" << std::endl;
+        std::cout << "-R : For long-read use simulated random sequences (default uses data from bonito basecaller for Oxford Nanopore reads)" << std::endl;
         std::cout << "-M : 0, 1, [2]. Only used in benchmark mode: -M 0, runs only cudaPOA, -M 1, runs only SPOA, -M 2, default, runs both" << std::endl;
         std::cout << "-V : 0, [1]. Verbose mode, only used in benchmark mode. -V 1, default, will output details per window. -V 0 only reports average metrics among windows." << std::endl;
         std::cout << "-h : Print help message" << std::endl;
@@ -414,7 +419,15 @@ int main(int argc, char** argv)
     {
         if (long_read)
         {
-            generate_simulated_reads(number_of_windows, sequence_size, group_size, windows, batch_size);
+            if(bonito)
+            {
+                const std::string input_file = std::string(CUDAPOA_BENCHMARK_DATA_DIR) + "/sample-bonito.txt";
+                generate_window_data(input_file, number_of_windows, group_size, windows, batch_size);
+            }
+            else
+            {
+                generate_simulated_reads(number_of_windows, sequence_size, group_size, windows, batch_size);
+            }
         }
         else
         {
@@ -560,7 +573,18 @@ int main(int argc, char** argv)
         std::cerr << "Sequence length(S) " << std::left << std::setw(9) << std::fixed << sequence_size;
         std::cerr << "Number of sequences per window(N) " << std::left << std::setw(30) << group_size << std::endl;
         std::cerr << "Number of threads(t) " << std::left << std::setw(14) << std::fixed << number_of_threads;
-        std::cerr << "Banded alignment for cudaPOA:      ";
+        std::cerr << "Dataset " << std::left << std::setw(20) << std::fixed;
+        if(long_read)
+        {
+            if(bonito)
+                std::cerr << " bonito";
+            else
+                std::cerr << " simulated";
+        }
+        else {
+            std::cerr << " short";
+        }
+        std::cerr << "Banded alignment for cudaPOA      ";
         if (banded)
             std::cerr << "ON\n";
         else
