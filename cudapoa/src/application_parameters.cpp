@@ -165,6 +165,16 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         throw std::runtime_error("gap score must be non-positive");
     }
 
+    if (benchmark_mode > -1 && msa)
+    {
+        throw std::runtime_error("MSA is not available in benchmark mode");
+    }
+
+    if (benchmark_mode > -1 && !graph_output_path.empty())
+    {
+        throw std::runtime_error("graph output is not available in benchmark mode");
+    }
+
     verify_input_files(input_paths);
 }
 
