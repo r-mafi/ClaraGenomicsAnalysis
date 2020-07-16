@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
     // processing only a single window defined by option -D
     if (parameters.single_window > -1 && parameters.single_window < get_size<int>(windows))
     {
-        auto window       = windows[parameters.single_window];
+        auto window = windows[parameters.single_window];
         windows.resize(1);
         windows[0] = window;
     }
@@ -217,6 +217,13 @@ int main(int argc, char* argv[])
                           parameters.gap_score,
                           parameters.match_score);
 
+    // for benchmarking
+    float alignment_A_time = 0.f;
+    float alignment_B_time = 0.f;
+    ChronoTimer timer;
+
+    bool print = parameters.benchmark_mode == -1;
+
     int32_t group_count_offset = 0;
 
     for (int32_t b = 0; b < get_size(list_of_batch_sizes); b++)
@@ -249,7 +256,7 @@ int main(int argc, char* argv[])
                 if (batch->get_total_poas() > 0)
                 {
                     // No more POA groups can be added to batch. Now process batch.
-                    process_batch(batch.get(), parameters.msa, true, batch_group_ids, group_count);
+                    process_batch(batch.get(), parameters.msa, print, batch_group_ids, group_count);
 
                     if (graph_output.is_open())
                     {

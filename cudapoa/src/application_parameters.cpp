@@ -57,7 +57,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"single-window", required_argument, 0, 'S'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:OS:N:vh";
+    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:vhB:COS:N:";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
