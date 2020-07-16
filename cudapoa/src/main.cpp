@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <string>
+#include <iomanip>
 #include <claraparabricks/genomeworks/cudapoa/utils.hpp> // for get_multi_batch_sizes()
 #include "application_parameters.hpp"
 
@@ -102,7 +103,7 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
     else
     {
         // Grab consensus results for all POA groups in batch.
-        std::vector<std::string> consensus; // Consensus string for each POA group
+        std::vector<std::string> consensus;          // Consensus string for each POA group
         std::vector<std::vector<uint16_t>> coverage; // Per base coverage for each consensus
         std::vector<StatusType> output_status;       // Status of consensus generation per group
 
@@ -299,6 +300,164 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
     }
 }
 
+// print benchmarking report
+void print_benchmark_report(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups, const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b)
+{
+    int32_t number_of_groups = get_size<int32_t>(poa_groups);
+    bool verbose             = !parameters.compact;
+
+    std::string method_a, method_b;
+    if (parameters.benchmark_mode == 0)
+    {
+        method_a = "adaptive ";
+        method_b = "banded   ";
+    }
+    else if (parameters.benchmark_mode == 1)
+    {
+        method_a = "adaptive ";
+        method_b = "full     ";
+    }
+    else if (parameters.benchmark_mode == 1)
+    {
+        method_a = "banded   ";
+        method_b = "full     ";
+    }
+
+    float compute_time_a = -1.0f, compute_time_b = -1.0f;
+
+    std::cerr << "\nbenchmark summary: ";
+    std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
+    std::cerr << "=============================================================================================================\n";
+    std::cerr << "Number of groups " << number_of_groups << std::endl;
+    std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(20);
+    std::cerr << std::fixed << std::setprecision(2) << compute_time_a;
+    std::cerr << method_b << std::fixed << std::setprecision(2) << compute_time_b << std::endl;
+    std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
+
+    int32_t actual_number_of_bases = 0;
+    for (auto& group : poa_groups)
+    {
+        for (auto& seq : group)
+        {
+            actual_number_of_bases += seq.length;
+        }
+    }
+    float perf_a = (float)actual_number_of_bases / compute_time_a;
+    float perf_b = (float)actual_number_of_bases / compute_time_b;
+    std::cerr << "Performance (bases/sec):        " << method_a << std::left << std::setw(20);
+    std::cerr << std::fixed << std::setprecision(2) << std::scientific << perf_a << " ";
+    std::cerr << method_b << std::left << std::setw(20) << perf_b;
+    if (perf_a > perf_b)
+        std::cerr << "x" << std::fixed << std::setprecision(1) << perf_a / perf_b << " faster";
+    else
+        std::cerr << "x" << std::fixed << std::setprecision(1) << perf_b / perf_a << " slower";
+    std::cerr << "\n-------------------------------------------------------------------------------------------------------------\n";
+    std::vector<int32_t> consensus_lengths_a(number_of_groups);
+    std::vector<int32_t> consensus_lengths_b(number_of_groups);
+    int32_t sum_consensus_length_a = 0;
+    int32_t sum_consensus_length_b = 0;
+    for (int i = 0; i < number_of_groups; i++)
+    {
+        consensus_lengths_a[i] = consensus_a[i].length();
+        sum_consensus_length_a += consensus_lengths_a[i];
+    }
+    for (int i = 0; i < number_of_groups; i++)
+    {
+        consensus_lengths_b[i] = consensus_b[i].length();
+        sum_consensus_length_b += consensus_lengths_b[i];
+    }
+
+    if (verbose)
+    {
+        float similarity_percentage;
+        for (int i = 0; i < number_of_groups; i++)
+        {
+            int width = i < 9 ? 4 : i < 99 ? 3 : i < 999 ? 2 : 1;
+            std::cerr << "Consensus length for group " << i + 1 << std::left << std::setw(width) << ":" << method_a;
+            std::cerr << std::left << std::setw(21) << consensus_lengths_a[i];
+            std::cerr << method_b << std::left << std::setw(15) << consensus_lengths_b[i];
+            similarity_percentage = 100.0f * (1.0f - (float)abs(consensus_lengths_a[i] - consensus_lengths_b[i]) / (float)consensus_lengths_b[i]);
+            std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar length";
+            std::cerr << std::endl;
+        }
+    }
+    else
+    {
+        std::cerr << "Average consensus length:          " << method_a << std::left << std::setw(20);
+        std::cerr << sum_consensus_length_a / number_of_groups;
+        std::cerr << method_b << std::left << std::setw(20) << sum_consensus_length_b / number_of_groups;
+        float length_similarity_percentage = 100.0f * (1.0f - (float)abs(sum_consensus_length_a - sum_consensus_length_b) / (float)sum_consensus_length_b);
+        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << length_similarity_percentage << "% similar length";
+        std::cerr << std::endl;
+    }
+    if (verbose)
+    {
+        // print accuracy metrics
+        //            std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
+        //
+        //            std::vector<std::vector<std::string>> consensus_results(number_of_groups);
+        //            for (int i = 0; i < number_of_groups; i++)
+        //            {
+        //                consensus_results[i].push_back(consensus_a[i]);
+        //                consensus_results[i].push_back(consensus_b[i]);
+        //            }
+        //
+        //            spoa_compute(consensus_results, 0, number_of_groups, number_of_threads, true, false, consensus_);
+        //
+        //            // print comparison details between cudaPOA and SPOA consensus per window
+        //            for (int32_t g = 0; g < get_size(msa_s); g++)
+        //            {
+        //                int32_t insert_cntr   = 0;
+        //                int32_t delete_cntr   = 0;
+        //                int32_t mismatch_cntr = 0;
+        //                int32_t identity_cntr = 0;
+        //
+        //                int width = g < 9 ? 6 : g < 99 ? 5 : g < 999 ? 4 : 3;
+        //                std::cerr << "Differences for window      " << g + 1 << std::left << std::setw(width) << ":";
+        //
+        //                if (msa_s[g].size() == 2)
+        //                {
+        //                    const auto& target = msa_s[g][0];
+        //                    const auto& query  = msa_s[g][1];
+        //                    if (target.length() == query.length())
+        //                    {
+        //                        for (int32_t i = 0; i < target.length(); i++)
+        //                        {
+        //                            if (target[i] == '-')
+        //                                insert_cntr++;
+        //                            else if (query[i] == '-')
+        //                                delete_cntr++;
+        //                            else if (target[i] != query[i])
+        //                                mismatch_cntr++;
+        //                            else /*target[i] == query[i]*/
+        //                                identity_cntr++;
+        //                        }
+        //                        float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
+        //
+        //                        std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(15) << delete_cntr;
+        //                        std::cerr << "mismatches " << std::left << std::setw(14) << mismatch_cntr;
+        //                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
+        //                    }
+        //                    else
+        //                    {
+        //                        std::cerr << "indels  " << std::left << std::setw(20) << "--------";
+        //                        std::cerr << "mismatches " << std::left << std::setw(14) << "---";
+        //                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
+        //                                  << "% identity " << std::endl;
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    std::cerr << "indels  " << std::left << std::setw(20) << "--------";
+        //                    std::cerr << "mismatches " << std::left << std::setw(14) << "---";
+        //                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
+        //                              << "% identity " << std::endl;
+        //                }
+        //            }
+    }
+    std::cerr << "=============================================================================================================\n\n";
+}
+
 int main(int argc, char* argv[])
 {
     // Parse input parameters
@@ -358,9 +517,10 @@ int main(int argc, char* argv[])
     }
 
     // for benchmarking
-    float alignment_A_time = 0.f;
-    float alignment_B_time = 0.f;
-    ChronoTimer timer;
+    float time_a = 0.f;
+    float time_b = 0.f;
+    std::vector<std::string> consensus_a;
+    std::vector<std::string> consensus_b;
 
     if (parameters.benchmark_mode == -1)
     {
@@ -372,16 +532,31 @@ int main(int argc, char* argv[])
         ApplicationParameters parameters_b = parameters;
         if (parameters.benchmark_mode == 0)
         {
-            parameters_a.adaptive = true;
-            parameters_b.adaptive = false;
+            parameters_a.adaptive = true;  // adaptive-alignment
+            parameters_b.adaptive = false; // banded-alignment
             parameters_b.banded   = true;
         }
-        // results vectors for each POA group for alignment methods a and b (e.g. adaptive and banded)
-        std::vector<std::string> consensus_a;
-        std::vector<std::string> consensus_b;
+        if (parameters.benchmark_mode == 1)
+        {
+            parameters_a.adaptive = true;  // adaptive-alignment
+            parameters_b.adaptive = false; // full-alignment
+            parameters_b.banded   = false;
+        }
+        if (parameters.benchmark_mode == 2)
+        {
+            parameters_a.adaptive = false; // banded-alignment
+            parameters_a.banded   = true;
+            parameters_b.adaptive = false; // full-alignment
+            parameters_b.banded   = false;
+        }
 
         run_cudapoa(parameters_a, poa_groups, &consensus_a);
         run_cudapoa(parameters_b, poa_groups, &consensus_b);
+    }
+
+    if (parameters.benchmark_mode > -1)
+    {
+        print_benchmark_report(parameters, poa_groups, consensus_a, consensus_b);
     }
 
     return 0;
