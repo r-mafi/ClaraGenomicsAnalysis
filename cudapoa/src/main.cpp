@@ -133,75 +133,8 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
     }
 }
 
-int main(int argc, char* argv[])
+void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups)
 {
-    // Parse input parameters
-    const ApplicationParameters parameters(argc, argv);
-
-    // Load input data. Each window is represented as a vector of strings. The sample
-    // data has many such windows to process, hence the data is loaded into a vector
-    // of vector of strings.
-    std::vector<std::vector<std::string>> windows;
-    if (parameters.all_fasta)
-    {
-        parse_fasta_files(windows, parameters.input_paths, parameters.max_groups);
-    }
-    else
-    {
-        parse_cudapoa_file(windows, parameters.input_paths[0], parameters.max_groups);
-    }
-
-    // processing only a single window defined by option -D
-    if (parameters.single_window > -1 && parameters.single_window < get_size<int>(windows))
-    {
-        auto window = windows[parameters.single_window];
-        windows.resize(1);
-        windows[0] = window;
-    }
-
-    // print-out reads in fasta format
-    if (parameters.output_fasta)
-    {
-        int64_t id = 0;
-        for (auto& w : windows)
-        {
-            for (auto& s : w)
-            {
-                std::cout << ">s" << id << std::endl;
-                std::cout << s << std::endl;
-                id++;
-            }
-        }
-        return 0;
-    }
-
-    std::ofstream graph_output;
-    if (!parameters.graph_output_path.empty())
-    {
-        graph_output.open(parameters.graph_output_path);
-        if (!graph_output)
-        {
-            std::cerr << "Error opening " << parameters.graph_output_path << " for graph output" << std::endl;
-            return -1;
-        }
-    }
-
-    // Create a vector of POA groups based on windows
-    std::vector<Group> poa_groups(windows.size());
-    for (int32_t i = 0; i < get_size(windows); ++i)
-    {
-        Group& group = poa_groups[i];
-        // Create a new entry for each sequence and add to the group.
-        for (const auto& seq : windows[i])
-        {
-            Entry poa_entry{};
-            poa_entry.seq     = seq.c_str();
-            poa_entry.length  = seq.length();
-            poa_entry.weights = nullptr;
-            group.push_back(poa_entry);
-        }
-    }
-
     // analyze the POA groups and create a minimal set of batches to process them all
     std::vector<BatchSize> list_of_batch_sizes;
     std::vector<std::vector<int32_t>> list_of_groups_per_batch;
@@ -219,12 +152,18 @@ int main(int argc, char* argv[])
                           parameters.gap_score,
                           parameters.match_score);
 
-    // for benchmarking
-    float alignment_A_time = 0.f;
-    float alignment_B_time = 0.f;
-    ChronoTimer timer;
-
     bool print = parameters.benchmark_mode == -1;
+
+    std::ofstream graph_output;
+    if (!parameters.graph_output_path.empty())
+    {
+        graph_output.open(parameters.graph_output_path);
+        if (!graph_output)
+        {
+            std::cerr << "Error opening " << parameters.graph_output_path << " for graph output" << std::endl;
+            return;
+        }
+    }
 
     int32_t group_count_offset = 0;
 
@@ -248,7 +187,7 @@ int main(int argc, char* argv[])
 
         for (int32_t i = 0; i < get_size(batch_group_ids);)
         {
-            Group& group = poa_groups[batch_group_ids[i]];
+            const Group& group = poa_groups[batch_group_ids[i]];
             std::vector<StatusType> seq_status;
             StatusType status = batch->add_poa_group(seq_status, group);
 
@@ -324,6 +263,72 @@ int main(int argc, char* argv[])
 
         group_count_offset += get_size(batch_group_ids);
     }
+}
+
+int main(int argc, char* argv[])
+{
+    // Parse input parameters
+    const ApplicationParameters parameters(argc, argv);
+
+    // Load input data. Each window is represented as a vector of strings. The sample
+    // data has many such windows to process, hence the data is loaded into a vector
+    // of vector of strings.
+    std::vector<std::vector<std::string>> windows;
+    if (parameters.all_fasta)
+    {
+        parse_fasta_files(windows, parameters.input_paths, parameters.max_groups);
+    }
+    else
+    {
+        parse_cudapoa_file(windows, parameters.input_paths[0], parameters.max_groups);
+    }
+
+    // processing only a single window defined by option -D
+    if (parameters.single_window > -1 && parameters.single_window < get_size<int>(windows))
+    {
+        auto window = windows[parameters.single_window];
+        windows.resize(1);
+        windows[0] = window;
+    }
+
+    // print-out reads in fasta format
+    if (parameters.output_fasta)
+    {
+        int64_t id = 0;
+        for (auto& w : windows)
+        {
+            for (auto& s : w)
+            {
+                std::cout << ">s" << id << std::endl;
+                std::cout << s << std::endl;
+                id++;
+            }
+        }
+        return 0;
+    }
+
+    // Create a vector of POA groups based on windows
+    std::vector<Group> poa_groups(windows.size());
+    for (int32_t i = 0; i < get_size(windows); ++i)
+    {
+        Group& group = poa_groups[i];
+        // Create a new entry for each sequence and add to the group.
+        for (const auto& seq : windows[i])
+        {
+            Entry poa_entry{};
+            poa_entry.seq     = seq.c_str();
+            poa_entry.length  = seq.length();
+            poa_entry.weights = nullptr;
+            group.push_back(poa_entry);
+        }
+    }
+
+    // for benchmarking
+    float alignment_A_time = 0.f;
+    float alignment_B_time = 0.f;
+    ChronoTimer timer;
+
+    run_cudapoa(parameters, poa_groups);
 
     return 0;
 }
