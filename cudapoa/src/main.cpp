@@ -19,6 +19,7 @@
 #include <iomanip>
 #include <claraparabricks/genomeworks/cudapoa/utils.hpp> // for get_multi_batch_sizes()
 #include "application_parameters.hpp"
+#include <spoa/spoa.hpp>
 
 namespace claraparabricks
 {
@@ -132,6 +133,33 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
         {
             *batch_consensus = std::move(consensus);
         }
+    }
+}
+
+void spoa_compute(const ApplicationParameters& parameters,
+                  const std::vector<std::vector<std::string>>& groups,
+                  const int32_t number_of_threads,
+                  std::vector<std::string>& consensus)
+{
+    spoa::AlignmentType atype = spoa::AlignmentType::kNW;
+    int match_score           = 8;
+    int mismatch_score        = -6;
+    int gap_score             = -8;
+
+    consensus.resize(groups.size()); // Consensus string for each POA group
+
+#pragma omp parallel for num_threads(number_of_threads)
+    for (int32_t g = 0; g < get_size<int32_t>(groups); g++)
+    {
+        auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
+        auto graph            = spoa::createGraph();
+        for (const auto& it : groups[g])
+        {
+            auto alignment = alignment_engine->align(it, graph);
+            graph->add_alignment(alignment, it);
+        }
+        consensus[g] = graph->generate_consensus();
+        graph->clear();
     }
 }
 
