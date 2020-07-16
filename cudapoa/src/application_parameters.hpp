@@ -51,6 +51,11 @@ public:
     float adaptive_storage      = 2.0f;
     float graph_length          = 3.0f;
     int32_t predecessor_disance = 0;
+    // for benchmark mode
+    bool compact          = true;
+    bool output_fasta     = false;
+    int32_t single_window = -1;
+    int32_t max_reads     = -1;
 
 private:
     /// \brief verifies input file formats

@@ -50,9 +50,13 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"gap", required_argument, 0, 'g'},
         {"version", no_argument, 0, 'v'},
         {"help", no_argument, 0, 'h'},
-    };
+        // for benchmarking
+        {"compact-mode", no_argument, 0, 'C'},
+        {"output-fasta", no_argument, 0, 'O'},
+        {"single-window", required_argument, 0, 'S'},
+        {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:vh";
+    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:OS:N:vh";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -105,6 +109,18 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'n':
             mismatch_score = std::stoi(optarg);
+            break;
+        case 'C':
+            compact = true;
+            break;
+        case 'O':
+            output_fasta = true;
+            break;
+        case 'S':
+            single_window = std::stoi(optarg);
+            break;
+        case 'N':
+            max_reads = std::stoi(optarg);
             break;
         case 'v':
             print_version();
@@ -228,6 +244,18 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -g, --gap  <int>
             score for gaps (must be non-positive) [-8])"
+              << R"(
+        -C, --compact-mode
+            disables verbose mode, where by default prints detailed comparison for each window [verbose])"
+              << R"(
+        -O, --output-fasta
+            output reads in fasta format and exits the application [disabled])"
+              << R"(
+        -D, --single-window  <int>
+            selects a single POA group instead of all input groups (must be positive and within the range of number of groups) [process all])"
+              << R"(
+        -N, --max-reads  <int>
+            max number of sequences per POA group (must be positive and less than number of reads)[process all])"
               << R"(
         -v, --version
             version information)"
