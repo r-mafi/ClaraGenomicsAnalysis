@@ -132,7 +132,7 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
 
         if (batch_consensus != nullptr)
         {
-            *batch_consensus = std::move(consensus);
+            batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
         }
     }
 }
@@ -148,7 +148,7 @@ void spoa_compute(const ApplicationParameters& parameters,
     int match_score           = parameters.match_score;
     int mismatch_score        = parameters.mismatch_score;
     int gap_score             = parameters.gap_score;
-    int number_of_groups = get_size<int>(groups);
+    int number_of_groups      = get_size<int>(groups);
 
     if (msa_flag)
     {
@@ -387,10 +387,10 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     std::cerr << "\nbenchmark summary: ";
     std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
     std::cerr << "=============================================================================================================\n";
-    std::cerr << "Number of groups " << number_of_groups << std::endl;
-    std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(21);
+    std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(17);
     std::cerr << std::fixed << std::setprecision(2) << compute_time_a;
-    std::cerr << method_b << std::fixed << std::setprecision(2) << compute_time_b << std::endl;
+    std::cerr << method_b << std::left << std::setw(15) << std::fixed << std::setprecision(2) << compute_time_b;
+    std::cerr << "Number of groups " << number_of_groups << std::endl;
     std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
 
     int32_t actual_number_of_bases = 0;
@@ -403,7 +403,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     }
     float perf_a = (float)actual_number_of_bases / compute_time_a;
     float perf_b = (float)actual_number_of_bases / compute_time_b;
-    std::cerr << "Performance (bases/sec):        " << method_a << std::left << std::setw(20);
+    std::cerr << "Performance (bases/sec):        " << method_a << std::left << std::setw(16);
     std::cerr << std::fixed << std::setprecision(2) << std::scientific << perf_a << " ";
     std::cerr << method_b << std::left << std::setw(15) << perf_b;
     if (perf_a > perf_b)
@@ -433,7 +433,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
         {
             int width = i < 9 ? 4 : i < 99 ? 3 : i < 999 ? 2 : 1;
             std::cerr << "Consensus length for group " << i + 1 << std::left << std::setw(width) << ":" << method_a;
-            std::cerr << std::left << std::setw(21) << consensus_lengths_a[i];
+            std::cerr << std::left << std::setw(17) << consensus_lengths_a[i];
             std::cerr << method_b << std::left << std::setw(15) << consensus_lengths_b[i];
             similarity_percentage = 100.0f * (1.0f - (float)abs(consensus_lengths_a[i] - consensus_lengths_b[i]) / (float)consensus_lengths_b[i]);
             std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar length";
@@ -442,9 +442,9 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     }
     else
     {
-        std::cerr << "Average consensus length:          " << method_a << std::left << std::setw(20);
+        std::cerr << "Average consensus length:       " << method_a << std::left << std::setw(17);
         std::cerr << sum_consensus_length_a / number_of_groups;
-        std::cerr << method_b << std::left << std::setw(20) << sum_consensus_length_b / number_of_groups;
+        std::cerr << method_b << std::left << std::setw(15) << sum_consensus_length_b / number_of_groups;
         float length_similarity_percentage = 100.0f * (1.0f - (float)abs(sum_consensus_length_a - sum_consensus_length_b) / (float)sum_consensus_length_b);
         std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << length_similarity_percentage << "% similar length";
         std::cerr << std::endl;
@@ -452,7 +452,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     if (verbose)
     {
         //print accuracy metrics
-        std::cerr  << "-------------------------------------------------------------------------------------------------------------\n";
+        std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
 
         std::vector<std::vector<std::string>> consensus_results(number_of_groups);
         for (int i = 0; i < number_of_groups; i++)
@@ -464,7 +464,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
         std::vector<std::vector<std::string>> msa_for_ab;
         std::vector<std::string> dummy;
 
-        spoa_compute(parameters,consensus_results, omp_get_num_procs(), true, msa_for_ab, dummy);
+        spoa_compute(parameters, consensus_results, omp_get_num_procs(), true, msa_for_ab, dummy);
 
         // print comparison details between method a and b consensus per window
         for (int g = 0; g < get_size(msa_for_ab); g++)
@@ -474,8 +474,8 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             int mismatch_cntr = 0;
             int identity_cntr = 0;
 
-            int width = g < 9 ? 6 : g < 99 ? 5 : g < 999 ? 4 : 3;
-            std::cerr << "Differences for group " << g + 1 << std::left << std::setw(width) << ":        ";
+            int width = g < 9 ? 9 : g < 99 ? 8 : g < 999 ? 7 : 6;
+            std::cerr << "Differences for group " << g + 1 << std::left << std::setw(width) << ":";
 
             if (msa_for_ab[g].size() == 2)
             {
@@ -496,21 +496,22 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
                     }
                     float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
 
-                    std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(17) << delete_cntr;
-                    std::cerr << "mismatches " << std::left << std::setw(15) << mismatch_cntr;
+                    std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(13) << delete_cntr;
+                    std::cerr << "mismatches " << std::left << std::setw(13) << mismatch_cntr;
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
                 }
                 else
                 {
-                    std::cerr << "indels  " << std::left << std::setw(20) << "--------";
-                    std::cerr << "mismatches " << std::left << std::setw(112) << "---";
-                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA" << "% identity " << std::endl;
+                    std::cerr << "indels  " << std::left << std::setw(18) << "--------";
+                    std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
+                              << "% identity " << std::endl;
                 }
             }
             else
             {
-                std::cerr << "indels  " << std::left << std::setw(20) << "--------";
-                std::cerr << "mismatches " << std::left << std::setw(10) << "---";
+                std::cerr << "indels  " << std::left << std::setw(18) << "--------";
+                std::cerr << "mismatches " << std::left << std::setw(13) << "---";
                 std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
                           << "% identity " << std::endl;
             }
