@@ -52,7 +52,7 @@ public:
     float graph_length          = 3.0f;
     int32_t predecessor_disance = 0;
     // for benchmark mode
-    bool compact           = true;
+    bool compact           = false;
     bool output_fasta      = false;
     int32_t benchmark_mode = -1;
     int32_t single_window  = -1;
