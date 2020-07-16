@@ -68,7 +68,7 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
     return std::move(batch);
 }
 
-void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>& list_of_group_ids, int id_offset)
+void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>& list_of_group_ids, int id_offset, std::vector<std::string>* batch_consensus = nullptr)
 {
     batch->generate_poa();
 
@@ -106,7 +106,7 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
     else
     {
         // Grab consensus results for all POA groups in batch.
-        std::vector<std::string> consensus;          // Consensus string for each POA group
+        std::vector<std::string> consensus; // Consensus string for each POA group
         std::vector<std::vector<uint16_t>> coverage; // Per base coverage for each consensus
         std::vector<StatusType> output_status;       // Status of consensus generation per group
 
@@ -130,11 +130,21 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
                 }
             }
         }
+
+        if (batch_consensus != nullptr)
+        {
+            *batch_consensus = std::move(consensus);
+        }
     }
 }
 
-void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups)
+void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups, std::vector<std::string>* consensus = nullptr)
 {
+    bool benchmark = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    if (benchmark)
+    {
+        consensus->resize(poa_groups.size());
+    }
     // analyze the POA groups and create a minimal set of batches to process them all
     std::vector<BatchSize> list_of_batch_sizes;
     std::vector<std::vector<int32_t>> list_of_groups_per_batch;
@@ -152,7 +162,7 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                           parameters.gap_score,
                           parameters.match_score);
 
-    bool print = parameters.benchmark_mode == -1;
+    bool print = true; ///parameters.benchmark_mode == -1;
 
     std::ofstream graph_output;
     if (!parameters.graph_output_path.empty())
@@ -171,6 +181,9 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
     {
         auto& batch_size      = list_of_batch_sizes[b];
         auto& batch_group_ids = list_of_groups_per_batch[b];
+
+        // for storing benchmark results
+        std::vector<std::string> batch_consensus;
 
         // Initialize batch.
         std::unique_ptr<Batch> batch = initialize_batch(parameters.mismatch_score,
@@ -199,7 +212,7 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 if (batch->get_total_poas() > 0)
                 {
                     // No more POA groups can be added to batch. Now process batch.
-                    process_batch(batch.get(), parameters.msa, print, batch_group_ids, group_count);
+                    process_batch(batch.get(), parameters.msa, print, batch_group_ids, group_count, &batch_consensus);
 
                     if (graph_output.is_open())
                     {
@@ -236,6 +249,10 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                     // the POA was too large to be added to the GPU, skip and move on
                     std::cerr << "Could not add POA group " << batch_group_ids[i] << " to batch " << b << std::endl;
                     i++;
+                    if (benchmark)
+                    {
+                        batch_consensus.push_back("");
+                    }
                 }
 
                 group_count = i;
@@ -258,10 +275,24 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
             {
                 std::cerr << "Could not add POA group " << batch_group_ids[i] << " to batch " << b << ". Error code " << status << std::endl;
                 i++;
+                if (benchmark)
+                {
+                    batch_consensus.push_back("");
+                }
             }
         }
 
         group_count_offset += get_size(batch_group_ids);
+
+        if (benchmark)
+        {
+            // add batch results to the global results vector
+            for (int32_t i = 0; i < get_size<int32_t>(batch_group_ids); i++)
+            {
+                int id            = batch_group_ids[i];
+                consensus->at(id) = batch_consensus[i];
+            }
+        }
     }
 }
 
@@ -328,7 +359,27 @@ int main(int argc, char* argv[])
     float alignment_B_time = 0.f;
     ChronoTimer timer;
 
-    run_cudapoa(parameters, poa_groups);
+    if (parameters.benchmark_mode == -1)
+    {
+        run_cudapoa(parameters, poa_groups);
+    }
+    else
+    {
+        ApplicationParameters parameters_a = parameters;
+        ApplicationParameters parameters_b = parameters;
+        if (parameters.benchmark_mode == 0)
+        {
+            parameters_a.adaptive = true;
+            parameters_b.adaptive = false;
+            parameters_b.banded   = true;
+        }
+        // results vectors for each POA group for alignment methods a and b (e.g. adaptive and banded)
+        std::vector<std::string> consensus_a;
+        std::vector<std::string> consensus_b;
+
+        run_cudapoa(parameters_a, poa_groups, &consensus_a);
+        run_cudapoa(parameters_b, poa_groups, &consensus_b);
+    }
 
     return 0;
 }
