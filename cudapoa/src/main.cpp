@@ -139,9 +139,11 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
     }
 }
 
-void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups, std::vector<std::string>* consensus = nullptr)
+void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups,
+                 float& compute_time, std::vector<std::string>* consensus = nullptr)
 {
     bool benchmark = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    ChronoTimer timer;
     if (benchmark)
     {
         consensus->resize(poa_groups.size());
@@ -212,8 +214,10 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 // at least one POA should have been added before processing the batch
                 if (batch->get_total_poas() > 0)
                 {
-                    // No more POA groups can be added to batch. Now process batch.
+                    // No more POA groups can be added to batch. Now process batch
+                    timer.start_timer();
                     process_batch(batch.get(), parameters.msa, print, batch_group_ids, group_count, &batch_consensus);
+                    compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
                     {
@@ -298,7 +302,9 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
 }
 
 // print benchmarking report
-void print_benchmark_report(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups, const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b)
+void print_benchmark_report(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups,
+                            const float compute_time_a, const float compute_time_b,
+                            const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b)
 {
     int32_t number_of_groups = get_size<int32_t>(poa_groups);
     bool verbose             = !parameters.compact;
@@ -319,8 +325,6 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
         method_a = "banded   ";
         method_b = "full     ";
     }
-
-    float compute_time_a = -1.0f, compute_time_b = -1.0f;
 
     std::cerr << "\nbenchmark summary: ";
     std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
@@ -343,7 +347,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     float perf_b = (float)actual_number_of_bases / compute_time_b;
     std::cerr << "Performance (bases/sec):        " << method_a << std::left << std::setw(20);
     std::cerr << std::fixed << std::setprecision(2) << std::scientific << perf_a << " ";
-    std::cerr << method_b << std::left << std::setw(20) << perf_b;
+    std::cerr << method_b << std::left << std::setw(15) << perf_b;
     if (perf_a > perf_b)
         std::cerr << "x" << std::fixed << std::setprecision(1) << perf_a / perf_b << " faster";
     else
@@ -521,7 +525,7 @@ int main(int argc, char* argv[])
 
     if (parameters.benchmark_mode == -1)
     {
-        run_cudapoa(parameters, poa_groups);
+        run_cudapoa(parameters, poa_groups, time_a);
     }
     else
     {
@@ -547,13 +551,13 @@ int main(int argc, char* argv[])
             parameters_b.banded   = false;
         }
 
-        run_cudapoa(parameters_a, poa_groups, &consensus_a);
-        run_cudapoa(parameters_b, poa_groups, &consensus_b);
+        run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a);
+        run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
     }
 
     if (parameters.benchmark_mode > -1)
     {
-        print_benchmark_report(parameters, poa_groups, consensus_a, consensus_b);
+        print_benchmark_report(parameters, poa_groups, time_a, time_b, consensus_a, consensus_b);
     }
 
     return 0;
