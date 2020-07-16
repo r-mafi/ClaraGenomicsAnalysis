@@ -48,6 +48,11 @@ public:
     int32_t gap_score         = -8;
     int32_t match_score       = 8;
     double gpu_mem_allocation = 0.9;
+    // for benchmark mode
+    bool compact          = true;
+    bool output_fasta     = false;
+    int32_t single_window = -1;
+    int32_t max_reads     = -1;
 
 private:
     /// \brief verifies input file formats
