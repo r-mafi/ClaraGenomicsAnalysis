@@ -52,7 +52,7 @@ cuda_add_library(cudapoa ${gw_library_type}
     ${CMAKE_CURRENT_BINARY_DIR}/version.cpp
     )
 
-target_link_libraries(cudapoa gwbase gwio)
+target_link_libraries(cudapoa gwbase gwio spoa)
 
 target_compile_options(cudapoa PRIVATE -Werror -Wall -Wextra)
 if (gw_optimize_for_native_cpu)
