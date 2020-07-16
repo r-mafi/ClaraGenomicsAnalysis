@@ -49,6 +49,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"version", no_argument, 0, 'v'},
         {"help", no_argument, 0, 'h'},
         // for benchmarking
+        {"benchmark-mode", required_argument, 0, 'B'},
         {"compact-mode", no_argument, 0, 'C'},
         {"output-fasta", no_argument, 0, 'O'},
         {"single-window", required_argument, 0, 'D'},
@@ -93,6 +94,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'n':
             mismatch_score = std::stoi(optarg);
+            break;
+        case 'B':
+            benchmark_mode = std::stoi(optarg);
             break;
         case 'C':
             compact = true;
@@ -222,6 +226,9 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -g, --gap  <int>
             score for gaps (must be non-positive) [-8])"
+              << R"(
+        -B, --benchmark-mode  <int>
+            [-1] disables benchmark-mode, [0] adaptive vs banded, [1] adaptive vs full, [2] banded vs full [-1])"
               << R"(
         -C, --compact-mode
             disables verbose mode, where by default prints detailed comparison for each window [verbose])"
