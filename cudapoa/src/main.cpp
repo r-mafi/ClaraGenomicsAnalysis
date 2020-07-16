@@ -152,6 +152,30 @@ int main(int argc, char* argv[])
         parse_cudapoa_file(windows, parameters.input_paths[0], parameters.max_groups);
     }
 
+    // processing only a single window defined by option -D
+    if (parameters.single_window > -1 && parameters.single_window < get_size<int>(windows))
+    {
+        auto window       = windows[parameters.single_window];
+        windows.resize(1);
+        windows[0] = window;
+    }
+
+    // print-out reads in fasta format
+    if (parameters.output_fasta)
+    {
+        int64_t id = 0;
+        for (auto& w : windows)
+        {
+            for (auto& s : w)
+            {
+                std::cout << ">s" << id << std::endl;
+                std::cout << s << std::endl;
+                id++;
+            }
+        }
+        return 0;
+    }
+
     std::ofstream graph_output;
     if (!parameters.graph_output_path.empty())
     {
