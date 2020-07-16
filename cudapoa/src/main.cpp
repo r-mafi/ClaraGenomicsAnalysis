@@ -20,6 +20,7 @@
 #include <claraparabricks/genomeworks/cudapoa/utils.hpp> // for get_multi_batch_sizes()
 #include "application_parameters.hpp"
 #include <spoa/spoa.hpp>
+#include <omp.h>
 
 namespace claraparabricks
 {
@@ -143,27 +144,53 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
 void spoa_compute(const ApplicationParameters& parameters,
                   const std::vector<std::vector<std::string>>& groups,
                   const int32_t number_of_threads,
+                  bool msa_flag,
+                  std::vector<std::vector<std::string>>& msa,
                   std::vector<std::string>& consensus)
 {
     spoa::AlignmentType atype = spoa::AlignmentType::kNW;
-    int match_score           = 8;
-    int mismatch_score        = -6;
-    int gap_score             = -8;
+    int match_score           = parameters.match_score;
+    int mismatch_score        = parameters.mismatch_score;
+    int gap_score             = parameters.gap_score;
+    int number_of_groups = get_size<int>(groups);
 
-    consensus.resize(groups.size()); // Consensus string for each POA group
+    if (msa_flag)
+    {
+        std::vector<std::vector<std::string>> msa_local(number_of_groups); // MSA per group
 
 #pragma omp parallel for num_threads(number_of_threads)
-    for (int32_t g = 0; g < get_size<int32_t>(groups); g++)
-    {
-        auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
-        auto graph            = spoa::createGraph();
-        for (const auto& it : groups[g])
+        for (int g = 0; g < number_of_groups; g++)
         {
-            auto alignment = alignment_engine->align(it, graph);
-            graph->add_alignment(alignment, it);
+            auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
+            auto graph            = spoa::createGraph();
+            for (const auto& it : groups[g])
+            {
+                auto alignment = alignment_engine->align(it, graph);
+                graph->add_alignment(alignment, it);
+            }
+            graph->generate_multiple_sequence_alignment(msa_local[g]);
+            graph->clear();
         }
-        consensus[g] = graph->generate_consensus();
-        graph->clear();
+
+        msa.insert(msa.end(), msa_local.begin(), msa_local.end());
+    }
+    else
+    {
+        consensus.resize(number_of_groups); // Consensus string for each POA group
+
+#pragma omp parallel for num_threads(number_of_threads)
+        for (int g = 0; g < number_of_groups; g++)
+        {
+            auto alignment_engine = spoa::createAlignmentEngine(atype, match_score, mismatch_score, gap_score);
+            auto graph            = spoa::createGraph();
+            for (const auto& it : groups[g])
+            {
+                auto alignment = alignment_engine->align(it, graph);
+                graph->add_alignment(alignment, it);
+            }
+            consensus[g] = graph->generate_consensus();
+            graph->clear();
+        }
     }
 }
 
@@ -193,7 +220,7 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                           parameters.gap_score,
                           parameters.match_score);
 
-    bool print = true; ///parameters.benchmark_mode == -1;
+    bool print = parameters.benchmark_mode == -1;
 
     std::ofstream graph_output;
     if (!parameters.graph_output_path.empty())
@@ -358,7 +385,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
     std::cerr << "=============================================================================================================\n";
     std::cerr << "Number of groups " << number_of_groups << std::endl;
-    std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(20);
+    std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(21);
     std::cerr << std::fixed << std::setprecision(2) << compute_time_a;
     std::cerr << method_b << std::fixed << std::setprecision(2) << compute_time_b << std::endl;
     std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
@@ -421,68 +448,70 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     }
     if (verbose)
     {
-        // print accuracy metrics
-        //            std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
-        //
-        //            std::vector<std::vector<std::string>> consensus_results(number_of_groups);
-        //            for (int i = 0; i < number_of_groups; i++)
-        //            {
-        //                consensus_results[i].push_back(consensus_a[i]);
-        //                consensus_results[i].push_back(consensus_b[i]);
-        //            }
-        //
-        //            spoa_compute(consensus_results, 0, number_of_groups, number_of_threads, true, false, consensus_);
-        //
-        //            // print comparison details between cudaPOA and SPOA consensus per window
-        //            for (int32_t g = 0; g < get_size(msa_s); g++)
-        //            {
-        //                int32_t insert_cntr   = 0;
-        //                int32_t delete_cntr   = 0;
-        //                int32_t mismatch_cntr = 0;
-        //                int32_t identity_cntr = 0;
-        //
-        //                int width = g < 9 ? 6 : g < 99 ? 5 : g < 999 ? 4 : 3;
-        //                std::cerr << "Differences for window      " << g + 1 << std::left << std::setw(width) << ":";
-        //
-        //                if (msa_s[g].size() == 2)
-        //                {
-        //                    const auto& target = msa_s[g][0];
-        //                    const auto& query  = msa_s[g][1];
-        //                    if (target.length() == query.length())
-        //                    {
-        //                        for (int32_t i = 0; i < target.length(); i++)
-        //                        {
-        //                            if (target[i] == '-')
-        //                                insert_cntr++;
-        //                            else if (query[i] == '-')
-        //                                delete_cntr++;
-        //                            else if (target[i] != query[i])
-        //                                mismatch_cntr++;
-        //                            else /*target[i] == query[i]*/
-        //                                identity_cntr++;
-        //                        }
-        //                        float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
-        //
-        //                        std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(15) << delete_cntr;
-        //                        std::cerr << "mismatches " << std::left << std::setw(14) << mismatch_cntr;
-        //                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
-        //                    }
-        //                    else
-        //                    {
-        //                        std::cerr << "indels  " << std::left << std::setw(20) << "--------";
-        //                        std::cerr << "mismatches " << std::left << std::setw(14) << "---";
-        //                        std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
-        //                                  << "% identity " << std::endl;
-        //                    }
-        //                }
-        //                else
-        //                {
-        //                    std::cerr << "indels  " << std::left << std::setw(20) << "--------";
-        //                    std::cerr << "mismatches " << std::left << std::setw(14) << "---";
-        //                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
-        //                              << "% identity " << std::endl;
-        //                }
-        //            }
+        //print accuracy metrics
+        std::cerr  << "-------------------------------------------------------------------------------------------------------------\n";
+
+        std::vector<std::vector<std::string>> consensus_results(number_of_groups);
+        for (int i = 0; i < number_of_groups; i++)
+        {
+            consensus_results[i].push_back(consensus_a[i]);
+            consensus_results[i].push_back(consensus_b[i]);
+        }
+
+        std::vector<std::vector<std::string>> msa_for_ab;
+        std::vector<std::string> dummy;
+
+        spoa_compute(parameters,consensus_results, omp_get_num_procs(), true, msa_for_ab, dummy);
+
+        // print comparison details between method a and b consensus per window
+        for (int g = 0; g < get_size(msa_for_ab); g++)
+        {
+            int insert_cntr   = 0;
+            int delete_cntr   = 0;
+            int mismatch_cntr = 0;
+            int identity_cntr = 0;
+
+            int width = g < 9 ? 6 : g < 99 ? 5 : g < 999 ? 4 : 3;
+            std::cerr << "Differences for group " << g + 1 << std::left << std::setw(width) << ":        ";
+
+            if (msa_for_ab[g].size() == 2)
+            {
+                const auto& target = msa_for_ab[g][0];
+                const auto& query  = msa_for_ab[g][1];
+                if (target.length() == query.length())
+                {
+                    for (int i = 0; i < target.length(); i++)
+                    {
+                        if (target[i] == '-')
+                            insert_cntr++;
+                        else if (query[i] == '-')
+                            delete_cntr++;
+                        else if (target[i] != query[i])
+                            mismatch_cntr++;
+                        else /*target[i] == query[i]*/
+                            identity_cntr++;
+                    }
+                    float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
+
+                    std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(17) << delete_cntr;
+                    std::cerr << "mismatches " << std::left << std::setw(15) << mismatch_cntr;
+                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
+                }
+                else
+                {
+                    std::cerr << "indels  " << std::left << std::setw(20) << "--------";
+                    std::cerr << "mismatches " << std::left << std::setw(112) << "---";
+                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA" << "% identity " << std::endl;
+                }
+            }
+            else
+            {
+                std::cerr << "indels  " << std::left << std::setw(20) << "--------";
+                std::cerr << "mismatches " << std::left << std::setw(10) << "---";
+                std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
+                          << "% identity " << std::endl;
+            }
+        }
     }
     std::cerr << "=============================================================================================================\n\n";
 }
