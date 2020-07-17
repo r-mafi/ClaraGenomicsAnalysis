@@ -58,6 +58,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
     std::string optstring = "i:afb:Ad:M:R:m:n:g:vhB:COD:N:";
 
     int32_t argument = 0;
+    bool default_bandwidth = true;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
     {
         switch (argument)
@@ -73,6 +74,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'b':
             band_width = std::stoi(optarg);
+            default_bandwidth = false;
             break;
         case 'A':
             adaptive = true;
@@ -127,6 +129,17 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
     if (banded && band_width < 1)
     {
         throw std::runtime_error("band-width must be positive");
+    }
+
+    if (!banded && adaptive)
+    {
+        throw std::runtime_error("adaptive alignment cannot run with full alignment");
+    }
+
+    if (adaptive && default_bandwidth)
+    {
+        // Bump up the default bandwidth as it is 256 for static banded which is too low
+        band_width = 2048;
     }
 
     if (match_score < 0)
