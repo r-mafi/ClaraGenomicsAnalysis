@@ -50,12 +50,13 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"help", no_argument, 0, 'h'},
         // for benchmarking
         {"benchmark-mode", required_argument, 0, 'B'},
+        {"bonito-long", required_argument, 0, 'L'},
         {"compact-mode", no_argument, 0, 'C'},
         {"output-fasta", no_argument, 0, 'O'},
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Ad:M:R:m:n:g:vhB:COD:N:";
+    std::string optstring = "i:afb:Ad:M:R:m:n:g:vhLB:COD:N:";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -109,6 +110,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'N':
             max_reads = std::stoi(optarg);
+            break;
+        case 'L':
+            bonito_long = true;
             break;
         case 'v':
             print_version();

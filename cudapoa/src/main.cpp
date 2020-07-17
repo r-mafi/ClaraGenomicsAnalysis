@@ -31,6 +31,7 @@ namespace genomeworks
 namespace cudapoa
 {
 
+
 std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                         int32_t gap_score,
                                         int32_t match_score,
@@ -528,7 +529,7 @@ int main(int argc, char* argv[])
     std::vector<std::vector<std::string>> windows;
     if (parameters.all_fasta)
     {
-        parse_fasta_files(windows, parameters.input_paths, parameters.max_groups);
+        parse_fasta_files(windows, parameters.input_paths, parameters.max_groups, parameters.bonito_long);
     }
     else
     {
