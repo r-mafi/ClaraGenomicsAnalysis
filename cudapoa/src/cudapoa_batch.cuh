@@ -396,8 +396,7 @@ public:
     // Get the consensus for each POA.
     StatusType get_adaptive_bands(std::vector<int32_t>& min_band_width,
                                   std::vector<int32_t>& max_band_width,
-                                  std::vector<int32_t>& avg_band_width,
-                                  std::vector<genomeworks::cudapoa::StatusType>& output_status)
+                                  std::vector<int32_t>& avg_band_width)
     {
         // Check if adaptive banding was requested at init time.
         if (!adaptive_banding_)

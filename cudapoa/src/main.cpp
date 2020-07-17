@@ -71,12 +71,20 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
     return std::move(batch);
 }
 
-void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>& list_of_group_ids, int id_offset, std::vector<std::string>* batch_consensus = nullptr)
+void process_batch(Batch* batch,
+                   const ApplicationParameters& parameters,
+                   const std::vector<int32_t>& list_of_group_ids,
+                   const int id_offset,
+                   std::vector<std::string>* batch_consensus = nullptr,
+                   std::vector<int32_t>* batch_min_bw        = nullptr,
+                   std::vector<int32_t>* batch_max_bw        = nullptr,
+                   std::vector<int32_t>* batch_avg_bw        = nullptr)
 {
     batch->generate_poa();
 
+    bool print        = parameters.benchmark_mode == -1;
     StatusType status = StatusType::success;
-    if (msa_flag)
+    if (parameters.msa)
     {
         // Grab MSA results for all POA groups in batch.
         std::vector<std::vector<std::string>> msa; // MSA per group
@@ -137,11 +145,17 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
         if (batch_consensus != nullptr)
         {
             batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
-
-            //            std::vector<int32_t> min_band_width;
-            //            std::vector<int32_t> max_band_width;
-            //            std::vector<int32_t> avg_band_width;
-            //            batch->get_adaptive_bands(min_band_width, max_band_width, avg_band_width, output_status);
+            // get band-widths stats
+            if (parameters.benchmark_mode && !parameters.compact)
+            {
+                std::vector<int32_t> min_bw;
+                std::vector<int32_t> max_bw;
+                std::vector<int32_t> avg_bw;
+                batch->get_adaptive_bands(min_bw, max_bw, avg_bw);
+                batch_min_bw->insert(batch_min_bw->end(), min_bw.begin(), min_bw.end());
+                batch_max_bw->insert(batch_max_bw->end(), max_bw.begin(), max_bw.end());
+                batch_avg_bw->insert(batch_avg_bw->end(), avg_bw.begin(), avg_bw.end());
+            }
         }
     }
 }
@@ -199,14 +213,26 @@ void spoa_compute(const ApplicationParameters& parameters,
     }
 }
 
-void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups,
-                 float& compute_time, std::vector<std::string>* consensus = nullptr)
+void run_cudapoa(const ApplicationParameters& parameters,
+                 const std::vector<Group>& poa_groups,
+                 float& compute_time,
+                 std::vector<std::string>* consensus  = nullptr,
+                 std::vector<int32_t>* min_band_width = nullptr,
+                 std::vector<int32_t>* max_band_width = nullptr,
+                 std::vector<int32_t>* avg_band_width = nullptr)
 {
-    bool benchmark = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    bool band_stats = !parameters.compact && (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
     ChronoTimer timer;
     if (benchmark)
     {
         consensus->resize(poa_groups.size());
+        if (band_stats)
+        {
+            min_band_width->resize(poa_groups.size());
+            max_band_width->resize(poa_groups.size());
+            avg_band_width->resize(poa_groups.size());
+        }
     }
     // analyze the POA groups and create a minimal set of batches to process them all
     std::vector<BatchSize> list_of_batch_sizes;
@@ -224,8 +250,6 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                           parameters.mismatch_score,
                           parameters.gap_score,
                           parameters.match_score);
-
-    bool print = parameters.benchmark_mode == -1;
 
     std::ofstream graph_output;
     if (!parameters.graph_output_path.empty())
@@ -247,6 +271,9 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
 
         // for storing benchmark results
         std::vector<std::string> batch_consensus;
+        std::vector<int32_t> batch_min_bw;
+        std::vector<int32_t> batch_max_bw;
+        std::vector<int32_t> batch_avg_bw;
 
         // Initialize batch.
         std::unique_ptr<Batch> batch = initialize_batch(parameters.mismatch_score,
@@ -276,7 +303,7 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 {
                     // No more POA groups can be added to batch. Now process batch
                     timer.start_timer();
-                    process_batch(batch.get(), parameters.msa, print, batch_group_ids, group_count, &batch_consensus);
+                    process_batch(batch.get(), parameters, batch_group_ids, group_count, &batch_consensus, &batch_min_bw, &batch_max_bw, &batch_avg_bw);
                     compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
@@ -317,6 +344,12 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                     if (benchmark)
                     {
                         batch_consensus.push_back("");
+                        if (band_stats)
+                        {
+                            batch_min_bw.push_back(-1);
+                            batch_max_bw.push_back(-1);
+                            batch_avg_bw.push_back(-1);
+                        }
                     }
                 }
 
@@ -343,6 +376,12 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 if (benchmark)
                 {
                     batch_consensus.push_back("");
+                    if (band_stats)
+                    {
+                        batch_min_bw.push_back(-1);
+                        batch_max_bw.push_back(-1);
+                        batch_avg_bw.push_back(-1);
+                    }
                 }
             }
         }
@@ -351,11 +390,17 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
 
         if (benchmark)
         {
-            // add batch results to the global results vector
+            // add batch results to the global results vectors
             for (int32_t i = 0; i < get_size<int32_t>(batch_group_ids); i++)
             {
                 int id            = batch_group_ids[i];
                 consensus->at(id) = batch_consensus[i];
+                if (band_stats)
+                {
+                    min_band_width->at(id) = batch_min_bw[i];
+                    max_band_width->at(id) = batch_max_bw[i];
+                    avg_band_width->at(id) = batch_avg_bw[i];
+                }
             }
         }
     }
@@ -585,6 +630,10 @@ int main(int argc, char* argv[])
     float time_b = 0.f;
     std::vector<std::string> consensus_a;
     std::vector<std::string> consensus_b;
+    // to record min/max and average width of adaptive bands
+    std::vector<int32_t> min_band_width_a;
+    std::vector<int32_t> max_band_width_a;
+    std::vector<int32_t> avg_band_width_a;
 
     if (parameters.benchmark_mode == -1)
     {
@@ -614,7 +663,7 @@ int main(int argc, char* argv[])
             parameters_b.banded   = false;
         }
 
-        run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a);
+        run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a);
         run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
     }
 
