@@ -201,6 +201,19 @@ public:
     virtual void get_graphs(std::vector<DirectedGraph>& graphs,
                             std::vector<StatusType>& output_status) = 0;
 
+    /// \brief Used in benchmark mode, extracts min, max and average band-width per POA for
+    /// adaptive-banded alignment. These values are from aligning the last sequence of POA group to the graph
+    ///
+    /// \param min_band_width   minimum band-width in adaptive alignment
+    /// \param max_band_width   maximum band-width in adaptive alignment
+    /// \param avg_band_width   average band-width in adaptive alignment
+    /// \param output_status    reference to vector where the errors
+    ///                         during kernel execution is captured
+    virtual StatusType get_adaptive_bands(std::vector<int32_t>& min_band_width,
+                                          std::vector<int32_t>& max_band_width,
+                                          std::vector<int32_t>& avg_band_width,
+                                          std::vector<StatusType>& output_status) = 0;
+
     /// \brief Return batch ID.
     ///
     /// \return Batch ID

@@ -137,6 +137,11 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
         if (batch_consensus != nullptr)
         {
             batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
+
+            std::vector<int32_t> min_band_width;
+            std::vector<int32_t> max_band_width;
+            std::vector<int32_t> avg_band_width;
+            batch->get_adaptive_bands(min_band_width, max_band_width, avg_band_width, output_status);
         }
     }
 }
@@ -368,21 +373,21 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     if (parameters.benchmark_mode == 0)
     {
         method_a = "adaptive ";
-        method_b = "banded   ";
+        method_b = "banded ";
     }
     else if (parameters.benchmark_mode == 1)
     {
         method_a = "adaptive ";
-        method_b = "full     ";
+        method_b = "full ";
     }
-    else if (parameters.benchmark_mode == 1)
+    else if (parameters.benchmark_mode == 2)
     {
-        method_a = "banded   ";
-        method_b = "full     ";
+        method_a = "banded ";
+        method_b = "full ";
     }
 
     std::cerr << "\nbenchmark summary: ";
-    std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
+    std::cerr << method_a << "alignment vs " << method_b << "alignment\n";
     std::cerr << "=============================================================================================================\n";
     std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(17);
     std::cerr << std::fixed << std::setprecision(2) << compute_time_a;
@@ -494,13 +499,13 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
                     float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
 
                     std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(13) << delete_cntr;
-                    std::cerr << "mismatches " << std::left << std::setw(13) << mismatch_cntr;
+                    std::cerr << "mismatches " << std::left << std::setw(11) << mismatch_cntr;
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
                 }
                 else
                 {
                     std::cerr << "indels  " << std::left << std::setw(18) << "--------";
-                    std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                    std::cerr << "mismatches " << std::left << std::setw(11) << "---";
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
                               << "% identity " << std::endl;
                 }
@@ -508,7 +513,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             else
             {
                 std::cerr << "indels  " << std::left << std::setw(18) << "--------";
-                std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                std::cerr << "mismatches " << std::left << std::setw(11) << "---";
                 std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
                           << "% identity " << std::endl;
             }

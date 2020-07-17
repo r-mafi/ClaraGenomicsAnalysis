@@ -393,6 +393,44 @@ public:
         }
     }
 
+    // Get the consensus for each POA.
+    StatusType get_adaptive_bands(std::vector<int32_t>& min_band_width,
+                                  std::vector<int32_t>& max_band_width,
+                                  std::vector<int32_t>& avg_band_width,
+                                  std::vector<genomeworks::cudapoa::StatusType>& output_status)
+    {
+        // Check if adaptive banding was requested at init time.
+        if (!adaptive_banding_)
+        {
+            return StatusType::output_type_unavailable;
+        }
+
+        SizeT* band_widths_h;
+        // Allocate.
+        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_window_banded * sizeof(*band_widths_h);
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_widths_h, bw_sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(band_widths_h,
+                                        alignment_details_d_->band_widths,
+                                        bw_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+//        for (int32_t poa = 0; poa < poa_count_; poa++)
+//        {
+//            for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+//                std::cout << band_widths_h[i] << std::endl;
+//        }
+
+        return StatusType::success;
+    }
+
     // Return batch ID.
     int32_t batch_id() const
     {
