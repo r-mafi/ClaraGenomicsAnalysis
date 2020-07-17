@@ -422,11 +422,40 @@ public:
         msg = " Finished memcpy D2H on device ";
         print_batch_debug_message(msg);
 
-//        for (int32_t poa = 0; poa < poa_count_; poa++)
-//        {
-//            for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
-//                std::cout << band_widths_h[i] << std::endl;
-//        }
+        min_band_width.resize(poa_count_);
+        max_band_width.resize(poa_count_);
+        avg_band_width.resize(poa_count_);
+
+        for (int32_t poa = 0; poa < poa_count_; poa++)
+        {
+            int32_t bw     = 0;
+            int32_t offset = poa * batch_size_.max_nodes_per_window_banded;
+
+            int32_t min_width = batch_size_.max_matrix_sequence_dimension;
+            int32_t max_width = 0;
+            int32_t sum_width = 0;
+            int32_t num_rows  = 0;
+
+            for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+            {
+                bw = band_widths_h[offset + i];
+                if (bw < 0)
+                {
+                    num_rows = i;
+                    break;
+                }
+                min_width = bw < min_width ? bw : min_width;
+                max_width = bw > max_width ? bw : max_width;
+                sum_width += bw;
+            }
+
+            if (num_rows > 0)
+            {
+                min_band_width[poa] = min_width;
+                max_band_width[poa] = max_width;
+                avg_band_width[poa] = sum_width / num_rows;
+            }
+        }
 
         return StatusType::success;
     }

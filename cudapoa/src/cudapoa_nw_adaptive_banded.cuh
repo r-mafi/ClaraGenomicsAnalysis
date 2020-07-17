@@ -572,6 +572,9 @@ __device__
     SizeT aligned_nodes = 0;
     if (lane_idx == 0)
     {
+        // mark end of band-width array
+        band_widths[graph_count + 1] = -1;
+
         // Find location of the maximum score in the matrix.
         SizeT i       = 0;
         SizeT j       = read_length;

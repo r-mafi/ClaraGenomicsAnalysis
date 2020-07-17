@@ -138,10 +138,10 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
         {
             batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
 
-            std::vector<int32_t> min_band_width;
-            std::vector<int32_t> max_band_width;
-            std::vector<int32_t> avg_band_width;
-            batch->get_adaptive_bands(min_band_width, max_band_width, avg_band_width, output_status);
+            //            std::vector<int32_t> min_band_width;
+            //            std::vector<int32_t> max_band_width;
+            //            std::vector<int32_t> avg_band_width;
+            //            batch->get_adaptive_bands(min_band_width, max_band_width, avg_band_width, output_status);
         }
     }
 }
