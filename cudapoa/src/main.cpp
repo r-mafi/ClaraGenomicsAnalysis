@@ -146,7 +146,7 @@ void process_batch(Batch* batch,
         {
             batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
             // get band-widths stats
-            if (parameters.benchmark_mode && !parameters.compact)
+            if ((parameters.benchmark_mode == 0 || parameters.benchmark_mode == 1) && !parameters.compact)
             {
                 std::vector<int32_t> min_bw;
                 std::vector<int32_t> max_bw;
@@ -222,7 +222,8 @@ void run_cudapoa(const ApplicationParameters& parameters,
                  std::vector<int32_t>* avg_band_width = nullptr)
 {
     bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
-    bool band_stats = !parameters.compact && (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
+    bool band_stats = (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
+    band_stats      = band_stats && !parameters.compact && benchmark && (parameters.benchmark_mode < 2);
     ChronoTimer timer;
     if (benchmark)
     {
@@ -409,7 +410,8 @@ void run_cudapoa(const ApplicationParameters& parameters,
 // print benchmarking report
 void print_benchmark_report(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups,
                             const float compute_time_a, const float compute_time_b,
-                            const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b)
+                            const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b,
+                            const std::vector<int32_t>& min_bw, const std::vector<int32_t>& max_bw, const std::vector<int32_t>& avg_bw)
 {
     int32_t number_of_groups = get_size<int32_t>(poa_groups);
     bool verbose             = !parameters.compact;
@@ -563,6 +565,30 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
                           << "% identity " << std::endl;
             }
         }
+
+        if (parameters.benchmark_mode != 2)
+        {
+            //print band-width stats
+            std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
+
+            std::cerr << "Band-width stats                              " << method_a << "          vs          " << method_b << std::endl;
+            std::cerr << "                                          min / max / avg " << std::endl;
+            for (int i = 0; i < get_size<int>(min_bw); i++)
+            {
+                int width = i < 9 ? 14 : i < 99 ? 13 : i < 999 ? 12 : 11;
+                std::cerr << "Band-width stats for group " << i + 1 << std::left << std::setw(width) << ":";
+                std::cerr << min_bw[i] << " / " << max_bw[i] << " / " << avg_bw[i];
+                if (parameters.benchmark_mode == 0)
+                {
+                    std::cerr << "                     " << parameters.band_width;
+                }
+                else
+                {
+                    std::cerr << "                    ---";
+                }
+                std::cerr << std::endl;
+            }
+        }
     }
     std::cerr << "=============================================================================================================\n\n";
 }
@@ -669,7 +695,7 @@ int main(int argc, char* argv[])
 
     if (parameters.benchmark_mode > -1)
     {
-        print_benchmark_report(parameters, poa_groups, time_a, time_b, consensus_a, consensus_b);
+        print_benchmark_report(parameters, poa_groups, time_a, time_b, consensus_a, consensus_b, min_band_width_a, max_band_width_a, avg_band_width_a);
     }
 
     return 0;

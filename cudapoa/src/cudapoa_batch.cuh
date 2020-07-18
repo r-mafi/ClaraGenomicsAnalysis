@@ -435,12 +435,13 @@ public:
             int32_t sum_width = 0;
             int32_t num_rows  = 0;
 
-            for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+            // ignore the first row, since it's just based on static band-width
+            for (int32_t i = 1; i < batch_size_.max_nodes_per_window_banded; i++)
             {
                 bw = band_widths_h[offset + i];
                 if (bw < 0)
                 {
-                    num_rows = i;
+                    num_rows = i - 1;
                     break;
                 }
                 min_width = bw < min_width ? bw : min_width;
