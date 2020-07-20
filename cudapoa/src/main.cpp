@@ -638,10 +638,16 @@ int main(int argc, char* argv[])
     std::vector<Group> poa_groups(windows.size());
     for (int32_t i = 0; i < get_size(windows); ++i)
     {
-        Group& group = poa_groups[i];
-        // Create a new entry for each sequence and add to the group.
-        for (const auto& seq : windows[i])
+        Group& group      = poa_groups[i];
+        int max_num_reads = get_size(windows[i]);
+        if (parameters.max_reads > 0)
         {
+            max_num_reads = std::min(max_num_reads, parameters.max_reads);
+        }
+        // Create a new entry for each sequence and add to the group.
+        for (int s = 0; s < max_num_reads; s++)
+        {
+            const auto& seq = windows[i][s];
             Entry poa_entry{};
             poa_entry.seq     = seq.c_str();
             poa_entry.length  = seq.length();
