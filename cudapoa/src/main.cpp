@@ -18,6 +18,7 @@
 #include <string>
 #include <iomanip>
 #include <claraparabricks/genomeworks/cudapoa/utils.hpp> // for get_multi_batch_sizes()
+#include <claraparabricks/genomeworks/cudapoa/matplotlibcpp.h>
 #include "application_parameters.hpp"
 #include <spoa/spoa.hpp>
 #include <omp.h>
