@@ -49,6 +49,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"mismatch", required_argument, 0, 'n'},
         {"gap", required_argument, 0, 'g'},
         {"version", no_argument, 0, 'v'},
+        {"print-output", no_argument, 0, 'p'},
         {"help", no_argument, 0, 'h'},
         // for benchmarking
         {"benchmark-mode", required_argument, 0, 'B'},
@@ -59,7 +60,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"filter-outliers", no_argument, 0, 'F'},
         {"sort-reads", no_argument, 0, 'T'}};
 
-    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:vhB:COS:N:FT";
+    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:vhB:COS:N:FTp";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -133,6 +134,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'T':
             sort_reads = true;
+            break;
+        case 'p':
+            print_output = true;
             break;
         case 'v':
             print_version();
@@ -287,6 +291,9 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -T, --sort-reads  <float>
              sorts reads in a POA group based on their lengths [disabled])"
+              << R"(
+        -p, --print-output
+            prints consensus/MSA output [disabled])"
               << R"(
         -v, --version
             version information)"

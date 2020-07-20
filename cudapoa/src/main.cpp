@@ -218,7 +218,7 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                           parameters.gap_score,
                           parameters.match_score);
 
-    bool print = parameters.benchmark_mode == -1;
+    bool print = parameters.print_output;
 
     std::ofstream graph_output;
     if (!parameters.graph_output_path.empty())
