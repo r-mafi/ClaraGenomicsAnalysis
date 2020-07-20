@@ -47,6 +47,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"mismatch", required_argument, 0, 'n'},
         {"gap", required_argument, 0, 'g'},
         {"version", no_argument, 0, 'v'},
+        {"print-output", no_argument, 0, 'p'},
         {"help", no_argument, 0, 'h'},
         // for benchmarking
         {"benchmark-mode", required_argument, 0, 'B'},
@@ -55,7 +56,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Ad:M:R:m:n:g:vhB:COD:N:";
+    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhB:COD:N:";
 
     int32_t argument       = 0;
     bool default_bandwidth = true;
@@ -78,6 +79,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'A':
             adaptive = true;
+            break;
+        case 'p':
+            print_output = true;
             break;
         case 'd':
             graph_output_path = std::string(optarg);
@@ -230,6 +234,9 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -A, --adaptive-alignment
             uses adaptive alignment if this flag is passed [banded alignment])"
+              << R"(
+        -p, --print-output
+            prints consensus/MSA output [disabled])"
               << R"(
         -d, --dot <file>
             output path for printing graph in DOT format [disabled])"

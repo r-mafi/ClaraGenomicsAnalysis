@@ -82,7 +82,6 @@ void process_batch(Batch* batch,
 {
     batch->generate_poa();
 
-    bool print        = parameters.benchmark_mode == -1;
     StatusType status = StatusType::success;
     if (parameters.msa)
     {
@@ -104,7 +103,7 @@ void process_batch(Batch* batch,
             }
             else
             {
-                if (print)
+                if (parameters.print_output)
                 {
                     for (const auto& alignment : msa[g])
                     {
@@ -135,7 +134,7 @@ void process_batch(Batch* batch,
             }
             else
             {
-                if (print)
+                if (parameters.print_output)
                 {
                     std::cout << consensus[g] << std::endl;
                 }
