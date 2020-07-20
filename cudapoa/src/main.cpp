@@ -527,8 +527,8 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
 
             if (msa_for_ab[g].size() == 2)
             {
-                const auto& target = msa_for_ab[g][0];
-                const auto& query  = msa_for_ab[g][1];
+                const auto& target = msa_for_ab[g][1];
+                const auto& query  = msa_for_ab[g][0];
                 if (target.length() == query.length())
                 {
                     for (int i = 0; i < target.length(); i++)
