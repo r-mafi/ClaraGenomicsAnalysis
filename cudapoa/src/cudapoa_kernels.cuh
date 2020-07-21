@@ -108,18 +108,17 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                   uint32_t max_nodes_per_window,
                                   uint32_t max_graph_dimension,
                                   uint32_t max_limit_consensus_size,
-
                                   SizeT* band_starts_d,
                                   SizeT* band_widths_d,
                                   int64_t* band_head_indices_d,
                                   SizeT* band_max_indices_d,
+                                  bool plot_traceback,
                                   SizeT* traceback_width_d,
                                   SizeT* traceback_height_d,
                                   int32_t TPB                          = 64,
                                   bool cuda_adaptive_banded            = false,
                                   bool cuda_banded_alignment           = false,
                                   bool msa                             = false,
-                                  bool plot_traceback                  = false,
                                   uint32_t banded_alignment_band_width = 256)
 {
     // shared error indicator within a warp
@@ -459,7 +458,8 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                  bool cuda_adaptive_banding,
                  uint32_t max_sequences_per_poa,
                  int8_t output_mask,
-                 const BatchSize& batch_size)
+                 const BatchSize& batch_size,
+                 bool traceback_flag)
 {
     // unpack output details
     uint8_t* consensus_d                  = output_details_d->consensus;
@@ -560,6 +560,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                       band_widths,
                                       head_indices,
                                       max_indices,
+                                      traceback_flag,
                                       traceback_width,
                                       traceback_height,
                                       TPB,

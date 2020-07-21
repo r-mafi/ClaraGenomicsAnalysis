@@ -158,7 +158,7 @@ public:
     }
 
     // Run partial order alignment algorithm over all POAs.
-    void generate_poa()
+    void generate_poa(bool plot_traceback = false)
     {
         scoped_device_switch dev(device_id_);
 
@@ -195,7 +195,8 @@ public:
                                    adaptive_banding_,
                                    max_sequences_per_poa_,
                                    output_mask_,
-                                   batch_size_);
+                                   batch_size_,
+                                   plot_traceback);
 
         msg = " Launched kernel on device ";
         print_batch_debug_message(msg);

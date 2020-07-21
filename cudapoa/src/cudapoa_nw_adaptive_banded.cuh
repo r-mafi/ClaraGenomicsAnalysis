@@ -603,13 +603,18 @@ __device__
         int32_t loop_count = 0;
         while (!(i == 0 && j == 0) && loop_count < static_cast<int32_t>(read_length + graph_count + 2))
         {
+            if (collect_traceback)
+            {
+                traceback_widths[loop_count]  = i;
+                traceback_heights[loop_count] = j;
+            }
+
             loop_count++;
             ScoreT scores_ij = get_score_adaptive(scores, i, j, band_starts, band_widths, head_indices, max_column, min_score_value);
             bool pred_found  = false;
             // Check if move is diagonal.
             if (i != 0 && j != 0)
             {
-
                 SizeT node_id     = graph[i - 1];
                 ScoreT match_cost = (nodes[node_id] == read[j - 1] ? match_score : mismatch_score);
 
@@ -685,6 +690,14 @@ __device__
 
             i = prev_i;
             j = prev_j;
+        }
+
+        if (collect_traceback)
+        {
+            traceback_widths[loop_count + 1]  = 0;
+            traceback_heights[loop_count + 1] = 0;
+            traceback_widths[loop_count + 2]  = -1;
+            traceback_heights[loop_count + 2] = -1;
         }
 
         if (loop_count >= (read_length + graph_count + 2))

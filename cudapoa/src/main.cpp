@@ -85,7 +85,7 @@ void process_batch(Batch* batch,
                    std::vector<int32_t>* batch_max_bw        = nullptr,
                    std::vector<int32_t>* batch_avg_bw        = nullptr)
 {
-    batch->generate_poa();
+    batch->generate_poa(parameters.plot_traceback);
 
     StatusType status = StatusType::success;
     if (parameters.msa)
