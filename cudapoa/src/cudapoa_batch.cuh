@@ -460,6 +460,58 @@ public:
         return StatusType::success;
     }
 
+    // Get the consensus for each POA.
+    StatusType get_traceback_path(std::vector<int32_t>& x,
+                                  std::vector<int32_t>& y)
+    {
+        // This kernel is used to plot traceback path and is available only for a single POA group
+        if (poa_count_ > 1)
+            return StatusType::output_type_unavailable;
+
+        SizeT *traceback_height_h;
+        SizeT *traceback_width_h;
+        // Allocate host memory
+        int32_t height   = batch_size_.max_nodes_per_window_banded;
+        size_t height_sz = height * sizeof(*traceback_height_h);
+        int32_t width    = batch_size_.max_matrix_sequence_dimension;
+        size_t width_sz  = width * sizeof(*traceback_width_h);
+
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&traceback_height_h, height_sz, cudaHostAllocDefault));
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&traceback_width_h, width_sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(traceback_height_h,
+                                        alignment_details_d_->traceback_height,
+                                        height_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(traceback_width_h,
+                                        alignment_details_d_->traceback_width,
+                                        width_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        x.resize(width);
+        y.resize(height);
+
+        for (int i = 0; i < width; i++)
+        {
+            x[width - i - 1] = traceback_width_h[i];
+        }
+
+        for (int j = 0; j < height; j++)
+        {
+            y[j] = -traceback_height_h[j];
+        }
+
+        return StatusType::success;
+    }
+
     // Return batch ID.
     int32_t batch_id() const
     {

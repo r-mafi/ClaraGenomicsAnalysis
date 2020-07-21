@@ -111,6 +111,10 @@ struct AlignmentDetails
     /// Buffer for storing max score index per row
     SizeT* band_max_indices;
 
+    /// Buffer space used for plotting traceback path, used only in benchmark mode
+    SizeT* traceback_height;
+    SizeT* traceback_width;
+
     // preallocated size of scores buffer
     size_t scorebuf_alloc_size = 0;
 

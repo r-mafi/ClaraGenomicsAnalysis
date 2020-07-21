@@ -210,6 +210,12 @@ public:
     virtual StatusType get_adaptive_bands(std::vector<int32_t>& min_band_width,
                                           std::vector<int32_t>& max_band_width,
                                           std::vector<int32_t>& avg_band_width) = 0;
+    /// \brief Used in benchmark mode, used to plot traceback path and is available only for a single POA group
+    ///
+    /// \param x   x-coordinates of the tracepack path
+    /// \param y   y-coordinates of the tracepack path
+    virtual StatusType get_traceback_path(std::vector<int32_t>& x,
+                                          std::vector<int32_t>& y) = 0;
 
     /// \brief Return batch ID.
     ///
