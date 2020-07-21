@@ -692,14 +692,6 @@ __device__
             j = prev_j;
         }
 
-        if (collect_traceback)
-        {
-            traceback_widths[loop_count + 1]  = 0;
-            traceback_heights[loop_count + 1] = 0;
-            traceback_widths[loop_count + 2]  = -1;
-            traceback_heights[loop_count + 2] = -1;
-        }
-
         if (loop_count >= (read_length + graph_count + 2))
         {
             aligned_nodes = -1;

@@ -186,6 +186,9 @@ __device__
                              ScoreT* scores,
                              SizeT* alignment_graph,
                              SizeT* alignment_read,
+                             SizeT* traceback_widths,
+                             SizeT* traceback_heights,
+                             bool collect_traceback,
                              SizeT band_width,
                              ScoreT gap_score,
                              ScoreT mismatch_score,
@@ -384,6 +387,12 @@ __device__
         int32_t loop_count = 0;
         while (!(i == 0 && j == 0) && loop_count < static_cast<int32_t>(read_length + graph_count + 2))
         {
+            if (collect_traceback)
+            {
+                traceback_widths[loop_count]  = i;
+                traceback_heights[loop_count] = j;
+            }
+
             loop_count++;
             ScoreT scores_ij = get_score(scores, i, j, gradient, band_width, max_column, min_score_value);
             bool pred_found  = false;
