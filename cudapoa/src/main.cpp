@@ -83,7 +83,9 @@ void process_batch(Batch* batch,
                    std::vector<std::string>* batch_consensus = nullptr,
                    std::vector<int32_t>* batch_min_bw        = nullptr,
                    std::vector<int32_t>* batch_max_bw        = nullptr,
-                   std::vector<int32_t>* batch_avg_bw        = nullptr)
+                   std::vector<int32_t>* batch_avg_bw        = nullptr,
+                   std::vector<int32_t>* x                   = nullptr,
+                   std::vector<int32_t>* y                   = nullptr)
 {
     batch->generate_poa(parameters.plot_traceback);
 
@@ -162,13 +164,9 @@ void process_batch(Batch* batch,
             }
         }
 
-        if (parameters.plot_traceback)
+        if (parameters.plot_traceback && x != nullptr && y != nullptr)
         {
-            std::vector<int32_t> x;
-            std::vector<int32_t> y;
-            batch->get_traceback_path(x, y);
-            plt::plot(x, y);
-            plt::show();
+            batch->get_traceback_path(*x, *y);
         }
     }
 }
@@ -232,7 +230,9 @@ void run_cudapoa(const ApplicationParameters& parameters,
                  std::vector<std::string>* consensus  = nullptr,
                  std::vector<int32_t>* min_band_width = nullptr,
                  std::vector<int32_t>* max_band_width = nullptr,
-                 std::vector<int32_t>* avg_band_width = nullptr)
+                 std::vector<int32_t>* avg_band_width = nullptr,
+                 std::vector<int32_t>* x_plot         = nullptr,
+                 std::vector<int32_t>* y_plot         = nullptr)
 {
     bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
     bool band_stats = (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
@@ -318,7 +318,8 @@ void run_cudapoa(const ApplicationParameters& parameters,
                 {
                     // No more POA groups can be added to batch. Now process batch
                     timer.start_timer();
-                    process_batch(batch.get(), parameters, batch_group_ids, group_count, &batch_consensus, &batch_min_bw, &batch_max_bw, &batch_avg_bw);
+                    process_batch(batch.get(), parameters, batch_group_ids, group_count, &batch_consensus,
+                                  &batch_min_bw, &batch_max_bw, &batch_avg_bw, x_plot, y_plot);
                     compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
@@ -683,7 +684,17 @@ int main(int argc, char* argv[])
 
     if (parameters.benchmark_mode == -1)
     {
-        run_cudapoa(parameters, poa_groups, time_a);
+        if (parameters.plot_traceback)
+        {
+            std::vector<int> x, y;
+            run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y);
+            plt::plot(x, y);
+            plt::show();
+        }
+        else
+        {
+            run_cudapoa(parameters, poa_groups, time_a);
+        }
     }
     else
     {
@@ -709,8 +720,20 @@ int main(int argc, char* argv[])
             parameters_b.banded   = false;
         }
 
-        run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a);
-        run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
+        if (parameters.plot_traceback)
+        {
+            std::vector<int> x_a, x_b, y_a, y_b;
+            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a);
+            run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x_b, &y_b);
+            plt::plot(x_a, y_a);
+            plt::plot(x_b, y_b, "r--");
+            plt::show();
+        }
+        else
+        {
+            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a);
+            run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
+        }
     }
 
     if (parameters.benchmark_mode > -1)

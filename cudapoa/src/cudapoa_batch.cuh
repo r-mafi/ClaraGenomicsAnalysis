@@ -514,11 +514,11 @@ public:
             }
         }
 
-        x.erase(x.begin()+path_length, x.end());
-        y.erase(y.begin()+path_length, y.end());
+        x.erase(x.begin() + path_length, x.end());
+        y.erase(y.begin() + path_length, y.end());
 
-//        for (int i = 0; i < path_length; i++)
-//            std::cout << x[i] << ", " << y[i] << std::endl;
+        //        for (int i = 0; i < path_length; i++)
+        //            std::cout << x[i] << ", " << y[i] << std::endl;
 
         return StatusType::success;
     }
