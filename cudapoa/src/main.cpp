@@ -41,7 +41,8 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                         bool banded_alignment,
                                         bool adaptive_banded,
                                         const double gpu_mem_allocation,
-                                        const BatchSize& batch_size)
+                                        const BatchSize& batch_size,
+                                        bool plot_traceback = false)
 {
     // Get device information.
     int32_t device_count = 0;
@@ -69,7 +70,8 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                                 mismatch_score,
                                                 match_score,
                                                 banded_alignment,
-                                                adaptive_banded);
+                                                adaptive_banded,
+                                                plot_traceback);
 
     return std::move(batch);
 }
@@ -286,7 +288,8 @@ void run_cudapoa(const ApplicationParameters& parameters,
                                                         parameters.banded,
                                                         parameters.adaptive,
                                                         parameters.gpu_mem_allocation,
-                                                        batch_size);
+                                                        batch_size,
+                                                        parameters.plot_traceback);
 
         // Loop over all the POA groups for the current batch, add them to the batch and process them.
         int32_t group_count = 0;

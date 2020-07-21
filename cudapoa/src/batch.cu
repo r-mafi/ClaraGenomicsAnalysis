@@ -39,7 +39,8 @@ std::unique_ptr<Batch> create_batch(int32_t device_id,
                                     int16_t mismatch_score,
                                     int16_t match_score,
                                     bool cuda_banded_alignment,
-                                    bool cuda_adaptive_alignment)
+                                    bool cuda_adaptive_alignment,
+                                    bool plot_traceback /*= false*/)
 {
     if (use32bitScore(batch_size, gap_score, mismatch_score, match_score))
     {
@@ -54,7 +55,8 @@ std::unique_ptr<Batch> create_batch(int32_t device_id,
                                                                     (int32_t)mismatch_score,
                                                                     (int32_t)match_score,
                                                                     cuda_banded_alignment,
-                                                                    cuda_adaptive_alignment);
+                                                                    cuda_adaptive_alignment,
+                                                                    plot_traceback);
         }
         else
         {
@@ -67,7 +69,8 @@ std::unique_ptr<Batch> create_batch(int32_t device_id,
                                                                     (int32_t)mismatch_score,
                                                                     (int32_t)match_score,
                                                                     cuda_banded_alignment,
-                                                                    cuda_adaptive_alignment);
+                                                                    cuda_adaptive_alignment,
+                                                                    plot_traceback);
         }
     }
     else
@@ -82,7 +85,8 @@ std::unique_ptr<Batch> create_batch(int32_t device_id,
                                                                 mismatch_score,
                                                                 match_score,
                                                                 cuda_banded_alignment,
-                                                                cuda_adaptive_alignment);
+                                                                cuda_adaptive_alignment,
+                                                                plot_traceback);
     }
 }
 

@@ -65,7 +65,7 @@ class CudapoaBatch : public Batch
 public:
     CudapoaBatch(int32_t device_id, cudaStream_t stream, size_t max_mem, int8_t output_mask,
                  const BatchSize& batch_size, ScoreT gap_score = -8, ScoreT mismatch_score = -6, ScoreT match_score = 8,
-                 bool cuda_banded_alignment = false, bool cuda_adaptive_banding = false)
+                 bool cuda_banded_alignment = false, bool cuda_adaptive_banding = false, bool plot_traceback = false)
         : max_sequences_per_poa_(throw_on_negative(batch_size.max_sequences_per_poa, "Maximum sequences per POA has to be non-negative"))
         , device_id_(throw_on_negative(device_id, "Device ID has to be non-negative"))
         , stream_(stream)
@@ -80,7 +80,9 @@ public:
                                                      max_mem,
                                                      output_mask,
                                                      batch_size_,
-                                                     cuda_banded_alignment, cuda_adaptive_banding))
+                                                     cuda_banded_alignment,
+                                                     cuda_adaptive_banding,
+                                                     plot_traceback))
         , max_poas_(batch_block_->get_max_poas())
     {
         // Set CUDA device

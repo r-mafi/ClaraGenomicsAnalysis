@@ -54,23 +54,25 @@ template <typename ScoreT, typename SizeT>
 class BatchBlock
 {
 public:
-    BatchBlock(int32_t device_id, size_t avail_mem, int8_t output_mask, const BatchSize& batch_size, bool banded_alignment = false, bool adaptive_banded = false)
+    BatchBlock(int32_t device_id, size_t avail_mem, int8_t output_mask, const BatchSize& batch_size, bool banded_alignment = false, bool adaptive_banded = false, bool plot_traceback = false)
         : max_sequences_per_poa_(throw_on_negative(batch_size.max_sequences_per_poa, "Maximum sequences per POA has to be non-negative"))
         , banded_alignment_(banded_alignment)
         , device_id_(throw_on_negative(device_id, "Device ID has to be non-negative"))
         , output_mask_(output_mask)
         , adaptive_banded_(adaptive_banded)
+        , plot_traceback_(plot_traceback)
     {
         scoped_device_switch dev(device_id_);
 
         matrix_sequence_dimension_ = banded_alignment_ ? (batch_size.alignment_band_width + CUDAPOA_BANDED_MATRIX_RIGHT_PADDING) : batch_size.max_matrix_sequence_dimension;
         max_graph_dimension_       = banded_alignment_ ? batch_size.max_matrix_graph_dimension_banded : batch_size.max_matrix_graph_dimension;
         max_nodes_per_window_      = banded_alignment_ ? batch_size.max_nodes_per_window_banded : batch_size.max_nodes_per_window;
+        max_sequence_length_       = batch_size.max_matrix_sequence_dimension;
 
         // calculate static and dynamic sizes of buffers needed per POA entry.
         int64_t host_size_fixed, device_size_fixed;
         int64_t host_size_per_poa, device_size_per_poa;
-        std::tie(host_size_fixed, device_size_fixed, host_size_per_poa, device_size_per_poa) = calculate_space_per_poa(batch_size);
+        std::tie(host_size_fixed, device_size_fixed, host_size_per_poa, device_size_per_poa) = calculate_space_per_poa(batch_size, plot_traceback);
 
         // Check minimum requirement for device memory
         size_t minimum_device_mem = device_size_fixed + device_size_per_poa;
@@ -214,6 +216,14 @@ public:
             offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_max_indices) * max_nodes_per_window_ * max_poas_);
         }
 
+        if (plot_traceback_)
+        {
+            alignment_details_d->traceback_width = reinterpret_cast<decltype(alignment_details_d->traceback_width)>(&block_data_d_[offset_d_]);
+            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->traceback_width) * max_sequence_length_ * max_poas_);
+            alignment_details_d->traceback_height = reinterpret_cast<decltype(alignment_details_d->traceback_height)>(&block_data_d_[offset_d_]);
+            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->traceback_height) * max_nodes_per_window_ * max_poas_);
+        }
+
         // rest of the available memory is assigned to scores buffer
         alignment_details_d->scorebuf_alloc_size = total_d_ - offset_d_;
         alignment_details_d->scores              = reinterpret_cast<decltype(alignment_details_d->scores)>(&block_data_d_[offset_d_]);
@@ -312,12 +322,13 @@ public:
 
     int32_t get_max_poas() const { return max_poas_; };
 
-    static int64_t compute_device_memory_per_poa(const BatchSize& batch_size, const bool banded_alignment, const bool adaptive_banded, const bool msa_flag)
+    static int64_t compute_device_memory_per_poa(const BatchSize& batch_size, const bool banded_alignment, const bool adaptive_banded, const bool msa_flag, const bool plot_traceback = false)
     {
         int64_t device_size_per_poa = 0;
 
         int32_t matrix_graph_dimension = banded_alignment ? batch_size.max_matrix_graph_dimension_banded : batch_size.max_matrix_graph_dimension;
         int32_t max_nodes_per_window   = banded_alignment ? batch_size.max_nodes_per_window_banded : batch_size.max_nodes_per_window;
+        int32_t max_sequence_length    = batch_size.max_matrix_sequence_dimension;
 
         // for output - device
         device_size_per_poa += batch_size.max_consensus_size * sizeof(*OutputDetails::consensus);                                                                        // output_details_d_->consensus
@@ -359,6 +370,8 @@ public:
         device_size_per_poa += adaptive_banded ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_widths) * max_nodes_per_window : 0;       // alignment_details_d_->band_widths
         device_size_per_poa += adaptive_banded ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_head_indices) * max_nodes_per_window : 0; // alignment_details_d_->band_head_indices
         device_size_per_poa += adaptive_banded ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_max_indices) * max_nodes_per_window : 0;  // alignment_details_d_->band_max_indices
+        device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::traceback_height) * max_nodes_per_window : 0;   // alignment_details_d->traceback_height
+        device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::traceback_width) * max_sequence_length : 0;     // alignment_details_d->traceback_length
 
         return device_size_per_poa;
     }
@@ -434,10 +447,10 @@ protected:
     // don't vary based on POA count. The latter two are host and device
     // buffer sizes that scale with number of POA entries to process. These sizes do
     // not include the scoring matrix needs for POA processing.
-    std::tuple<int64_t, int64_t, int64_t, int64_t> calculate_space_per_poa(const BatchSize& batch_size)
+    std::tuple<int64_t, int64_t, int64_t, int64_t> calculate_space_per_poa(const BatchSize& batch_size, bool plot_traceback)
     {
         int64_t host_size_per_poa   = compute_host_memory_per_poa(batch_size, banded_alignment_, (output_mask_ & OutputType::msa));
-        int64_t device_size_per_poa = compute_device_memory_per_poa(batch_size, banded_alignment_, adaptive_banded_, (output_mask_ & OutputType::msa));
+        int64_t device_size_per_poa = compute_device_memory_per_poa(batch_size, banded_alignment_, adaptive_banded_, (output_mask_ & OutputType::msa), plot_traceback);
         int64_t device_size_fixed   = 0;
         int64_t host_size_fixed     = 0;
         // for output - host
@@ -465,6 +478,9 @@ protected:
     bool banded_alignment_;
     bool adaptive_banded_;
 
+    // Flag for plotting traceback path
+    bool plot_traceback_;
+
     // Pointer for block data on host and device
     uint8_t* block_data_h_;
     uint8_t* block_data_d_;
@@ -482,6 +498,7 @@ protected:
     int32_t matrix_sequence_dimension_ = 0;
     int32_t max_graph_dimension_       = 0;
     int32_t max_nodes_per_window_      = 0;
+    int32_t max_sequence_length_       = 0;
     int32_t device_id_;
 
     // Bit field for output type
