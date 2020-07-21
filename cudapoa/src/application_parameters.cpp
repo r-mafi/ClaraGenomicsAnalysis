@@ -53,10 +53,11 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"benchmark-mode", required_argument, 0, 'B'},
         {"compact-mode", no_argument, 0, 'C'},
         {"output-fasta", no_argument, 0, 'O'},
+        {"plot-traceback", no_argument, 0, 'P'},
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhB:COD:N:";
+    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhB:COPD:N:";
 
     int32_t argument       = 0;
     bool default_bandwidth = true;
@@ -109,6 +110,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'O':
             output_fasta = true;
+            break;
+        case 'P':
+            plot_traceback = true;
             break;
         case 'D':
             single_window = std::stoi(optarg);
@@ -174,6 +178,11 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
     if (benchmark_mode > -1 && !graph_output_path.empty())
     {
         throw std::runtime_error("graph output is not available in benchmark mode");
+    }
+
+    if (plot_traceback && single_window < 0)
+    {
+        throw std::runtime_error("plot-traceback is only available for a single POA group and should be used with option -D");
     }
 
     verify_input_files(input_paths);
@@ -265,6 +274,9 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -O, --output-fasta
             output reads in fasta format and exits the application [disabled])"
+              << R"(
+        -P, --plot-traceback
+            plots the traceback path for a single group, this option should be used with option -D [disabled])"
               << R"(
         -D, --single-window  <int>
             selects a single POA group instead of all input groups (must be positive and within the range of number of groups) [process all])"

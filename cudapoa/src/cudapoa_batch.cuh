@@ -468,8 +468,8 @@ public:
         if (poa_count_ > 1)
             return StatusType::output_type_unavailable;
 
-        SizeT *traceback_height_h;
-        SizeT *traceback_width_h;
+        SizeT* traceback_height_h;
+        SizeT* traceback_width_h;
         // Allocate host memory
         int32_t height   = batch_size_.max_nodes_per_window_banded;
         size_t height_sz = height * sizeof(*traceback_height_h);
