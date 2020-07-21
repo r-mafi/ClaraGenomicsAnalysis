@@ -473,10 +473,9 @@ public:
         SizeT* traceback_height_h;
         SizeT* traceback_width_h;
         // Allocate host memory
-        int32_t height   = batch_size_.max_nodes_per_window_banded;
-        size_t height_sz = height * sizeof(*traceback_height_h);
-        int32_t width    = batch_size_.max_matrix_sequence_dimension;
-        size_t width_sz  = width * sizeof(*traceback_width_h);
+        int32_t max_dim  = 2 * batch_size_.max_nodes_per_window_banded;
+        size_t height_sz = max_dim * sizeof(*traceback_height_h);
+        size_t width_sz  = max_dim * sizeof(*traceback_width_h);
 
         GW_CU_CHECK_ERR(cudaHostAlloc((void**)&traceback_height_h, height_sz, cudaHostAllocDefault));
         GW_CU_CHECK_ERR(cudaHostAlloc((void**)&traceback_width_h, width_sz, cudaHostAllocDefault));
@@ -498,15 +497,15 @@ public:
         msg = " Finished memcpy D2H on device ";
         print_batch_debug_message(msg);
 
-        x.resize(width);
-        y.resize(height);
+        x.resize(max_dim);
+        y.resize(max_dim);
 
-        for (int i = 0; i < width; i++)
+        for (int i = 0; i < max_dim; i++)
         {
-            x[width - i - 1] = traceback_width_h[i];
+            x[max_dim - i - 1] = traceback_width_h[i];
         }
 
-        for (int j = 0; j < height; j++)
+        for (int j = 0; j < max_dim; j++)
         {
             y[j] = -traceback_height_h[j];
         }

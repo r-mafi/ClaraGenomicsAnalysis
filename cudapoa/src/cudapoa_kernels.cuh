@@ -108,14 +108,18 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                   uint32_t max_nodes_per_window,
                                   uint32_t max_graph_dimension,
                                   uint32_t max_limit_consensus_size,
+
                                   SizeT* band_starts_d,
                                   SizeT* band_widths_d,
                                   int64_t* band_head_indices_d,
                                   SizeT* band_max_indices_d,
+                                  SizeT* traceback_width_d,
+                                  SizeT* traceback_height_d,
                                   int32_t TPB                          = 64,
                                   bool cuda_adaptive_banded            = false,
                                   bool cuda_banded_alignment           = false,
                                   bool msa                             = false,
+                                  bool plot_traceback                  = false,
                                   uint32_t banded_alignment_band_width = 256)
 {
     // shared error indicator within a warp
@@ -164,6 +168,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
     SizeT* alignment_read          = &alignment_read_d[max_graph_dimension * window_idx];
     SizeT* band_starts             = &band_starts_d[max_nodes_per_window * window_idx];
     SizeT* band_widths             = &band_widths_d[max_nodes_per_window * window_idx];
+    SizeT* traceback_width         = &traceback_width_d[2 * max_nodes_per_window * window_idx];
+    SizeT* traceback_height        = &traceback_height_d[2 * max_nodes_per_window * window_idx];
     int64_t* head_indices          = &band_head_indices_d[max_nodes_per_window * window_idx];
     SizeT* max_indices             = &band_max_indices_d[max_nodes_per_window * window_idx];
     uint16_t* node_coverage_counts = &node_coverage_counts_d_[max_nodes_per_window * window_idx];
@@ -233,6 +239,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
         consensus[0] = CUDAPOA_KERNEL_NOERROR_ENCOUNTERED;
     }
 
+    bool collect_traceback = false; // used for plotting traceback
+
     __syncwarp();
 
     // Align each subsequent read, add alignment to graph, run topoligical sort.
@@ -241,6 +249,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
         SizeT seq_len = sequence_lengths[s];
         sequence += sequence_lengths[s - 1];     // increment the pointer so it is pointing to correct sequence data
         base_weights += sequence_lengths[s - 1]; // increment the pointer so it is pointing to correct sequence data
+
+        collect_traceback = plot_traceback && (s == num_sequences - 1);
 
         if (lane_idx == 0)
         {
@@ -294,6 +304,9 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                                                                             band_widths,
                                                                                             head_indices,
                                                                                             max_indices,
+                                                                                            traceback_width,
+                                                                                            traceback_height,
+                                                                                            collect_traceback,
                                                                                             banded_alignment_band_width,
                                                                                             gap_score,
                                                                                             mismatch_score,
@@ -461,13 +474,15 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
     SizeT* sequence_begin_nodes_ids = input_details_d->sequence_begin_nodes_ids;
 
     // unpack alignment details
-    ScoreT* scores         = alignment_details_d->scores;
-    SizeT* alignment_graph = alignment_details_d->alignment_graph;
-    SizeT* alignment_read  = alignment_details_d->alignment_read;
-    SizeT* band_starts     = alignment_details_d->band_starts;
-    SizeT* band_widths     = alignment_details_d->band_widths;
-    int64_t* head_indices  = alignment_details_d->band_head_indices;
-    SizeT* max_indices     = alignment_details_d->band_max_indices;
+    ScoreT* scores          = alignment_details_d->scores;
+    SizeT* alignment_graph  = alignment_details_d->alignment_graph;
+    SizeT* alignment_read   = alignment_details_d->alignment_read;
+    SizeT* band_starts      = alignment_details_d->band_starts;
+    SizeT* band_widths      = alignment_details_d->band_widths;
+    int64_t* head_indices   = alignment_details_d->band_head_indices;
+    SizeT* max_indices      = alignment_details_d->band_max_indices;
+    SizeT* traceback_width  = alignment_details_d->traceback_width;
+    SizeT* traceback_height = alignment_details_d->traceback_height;
 
     // unpack graph details
     uint8_t* nodes                          = graph_details_d->nodes;
@@ -545,6 +560,8 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                       band_widths,
                                       head_indices,
                                       max_indices,
+                                      traceback_width,
+                                      traceback_height,
                                       TPB,
                                       cuda_adaptive_banding,
                                       cuda_banded_alignment,
