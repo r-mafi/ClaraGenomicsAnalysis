@@ -165,7 +165,7 @@ public:
     virtual int32_t get_total_poas() const = 0;
 
     /// \brief Run partial order alignment algorithm over all POAs.
-    virtual void generate_poa(bool plot_traceback) = 0;
+    virtual void generate_poa(bool plot_traceback = false) = 0;
 
     /// \brief Get the consensus for each POA.
     ///
