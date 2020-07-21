@@ -161,6 +161,15 @@ void process_batch(Batch* batch,
                 batch_avg_bw->insert(batch_avg_bw->end(), avg_bw.begin(), avg_bw.end());
             }
         }
+
+        if (parameters.plot_traceback)
+        {
+            std::vector<int32_t> x;
+            std::vector<int32_t> y;
+            batch->get_traceback_path(x, y);
+            plt::plot(x, y);
+            plt::show();
+        }
     }
 }
 

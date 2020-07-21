@@ -501,15 +501,24 @@ public:
         x.resize(max_dim);
         y.resize(max_dim);
 
+        int path_length = 0;
+
         for (int i = 0; i < max_dim; i++)
         {
-            x[max_dim - i - 1] = traceback_width_h[i];
+            x[i] = traceback_width_h[i];
+            y[i] = traceback_height_h[i];
+            if (x[i] == 0 && y[i] == 0)
+            {
+                path_length = i + 1;
+                break;
+            }
         }
 
-        for (int j = 0; j < max_dim; j++)
-        {
-            y[j] = -traceback_height_h[j];
-        }
+        x.erase(x.begin()+path_length, x.end());
+        y.erase(y.begin()+path_length, y.end());
+
+//        for (int i = 0; i < path_length; i++)
+//            std::cout << x[i] << ", " << y[i] << std::endl;
 
         return StatusType::success;
     }
