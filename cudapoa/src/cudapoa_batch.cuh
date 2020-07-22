@@ -397,9 +397,9 @@ public:
     }
 
     // Get the consensus for each POA.
-    StatusType get_adaptive_bands(std::vector<int32_t>& min_band_width,
-                                  std::vector<int32_t>& max_band_width,
-                                  std::vector<int32_t>& avg_band_width)
+    StatusType get_adaptive_bandwidth_stats(std::vector<int32_t>& min_band_width,
+                                            std::vector<int32_t>& max_band_width,
+                                            std::vector<int32_t>& avg_band_width)
     {
         // Check if adaptive banding was requested at init time.
         if (!adaptive_banding_)
@@ -458,6 +458,57 @@ public:
                 max_band_width[poa] = max_width;
                 avg_band_width[poa] = sum_width / num_rows;
             }
+        }
+
+        return StatusType::success;
+    }
+
+    StatusType get_adaptive_band_boundaries(std::vector<int32_t>& band_start,
+                                            std::vector<int32_t>& band_end)
+    {
+        // This kernel is used to plot adaptive band ends and is available only for a single POA group
+        if (!adaptive_banding_ || poa_count_ > 1)
+        {
+            return StatusType::output_type_unavailable;
+        }
+
+        SizeT* band_starts_h;
+        SizeT* band_widths_h;
+        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_window_banded * sizeof(*band_widths_h);
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_starts_h, bw_sz, cudaHostAllocDefault));
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_widths_h, bw_sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(band_starts_h,
+                                        alignment_details_d_->band_starts,
+                                        bw_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(band_widths_h,
+                                        alignment_details_d_->band_widths,
+                                        bw_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        band_start.reserve(batch_size_.max_nodes_per_window_banded);
+        band_end.reserve(batch_size_.max_nodes_per_window_banded);
+
+        int bw = 0;
+
+        for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+        {
+            bw = band_widths_h[i];
+            if (bw < 0)
+            {
+                break;
+            }
+            band_start.push_back(band_starts_h[i]);
+            band_end.push_back(band_starts_h[i] + bw);
         }
 
         return StatusType::success;

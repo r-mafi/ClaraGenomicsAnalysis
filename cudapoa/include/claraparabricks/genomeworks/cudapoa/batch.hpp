@@ -207,9 +207,17 @@ public:
     /// \param min_band_width   minimum band-width in adaptive alignment
     /// \param max_band_width   maximum band-width in adaptive alignment
     /// \param avg_band_width   average band-width in adaptive alignment
-    virtual StatusType get_adaptive_bands(std::vector<int32_t>& min_band_width,
-                                          std::vector<int32_t>& max_band_width,
-                                          std::vector<int32_t>& avg_band_width) = 0;
+    virtual StatusType get_adaptive_bandwidth_stats(std::vector<int32_t>& min_band_width,
+                                                    std::vector<int32_t>& max_band_width,
+                                                    std::vector<int32_t>& avg_band_width) = 0;
+
+    /// \brief Used in benchmark mode, used to plot adaptive band head and tail per node
+    ///
+    /// \param band_start   start index of adaptive band per node
+    /// \param band_end     end index of adaptive band per node
+    virtual StatusType get_adaptive_band_boundaries(std::vector<int32_t>& band_start,
+                                                    std::vector<int32_t>& band_end) = 0;
+
     /// \brief Used in benchmark mode, used to plot traceback path and is available only for a single POA group
     ///
     /// \param x   x-coordinates of the tracepack path
