@@ -520,7 +520,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             }
             min_seq_length[i] = min_sz;
             max_seq_length[i] = max_sz;
-            avg_seq_length[i] = avg_sz;
+            avg_seq_length[i] = avg_sz = avg_sz/get_size<int>(group);
 
             std::cerr << "G " << std::left << std::setw(3) << i << " (" << std::left << std::setw(6) << min_sz << ", ";
             std::cerr << std::left << std::setw(6) << max_sz << ", " << std::left << std::setw(6) << avg_sz << std::left << std::setw(5) << ")";
