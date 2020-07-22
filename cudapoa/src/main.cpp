@@ -171,7 +171,7 @@ void process_batch(Batch* batch,
             batch->get_traceback_path(*traceback_x, *traceback_y);
 
             // for adaptive alignment, in addition to traceback path, extract boundaries of adaptive band
-            if ((parameters.benchmark_mode == 0 || parameters.benchmark_mode == 1) && band_s != nullptr && band_e != nullptr)
+            if ((parameters.benchmark_mode != 2) && band_s != nullptr && band_e != nullptr)
             {
                 batch->get_adaptive_band_boundaries(*band_s, *band_e);
             }
@@ -696,10 +696,25 @@ int main(int argc, char* argv[])
     {
         if (parameters.plot_traceback)
         {
-            std::vector<int32_t> x, y;
-            run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y);
-            plt::plot(x, y);
-            plt::show();
+            if (parameters.adaptive)
+            {
+                std::vector<int32_t> x, y;
+                std::vector<int32_t> abs, abe;
+                run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y, &abs, &abe);
+                std::vector<int32_t> lin(abs.size());
+                std::iota(lin.begin(), lin.end(), 0);
+                plt::plot(x, y);
+                plt::plot(abs, lin, "c:");
+                plt::plot(abe, lin, "c:");
+                plt::show();
+            }
+            else
+            {
+                std::vector<int32_t> x, y;
+                run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y);
+                plt::plot(x, y);
+                plt::show();
+            }
         }
         else
         {
@@ -732,20 +747,14 @@ int main(int argc, char* argv[])
 
         if (parameters.plot_traceback)
         {
-            std::vector<int32_t> x_a, x_b, y_a, y_b;
-            std::vector<int32_t> abs, abe; // adaptive_band_start and adaptive_band_end
+            std::vector<int32_t> x_a, x_b, y_a, y_b; // x and y coordinates of traceback path for alignment A and B
+            std::vector<int32_t> abs, abe;           // adaptive_band_start and adaptive_band_end
             run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a, &abs, &abe);
             run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x_b, &y_b);
-            // in traceback it starts from the bottom end corner of matrix, the following block reorders, but it's not necessary and it can be commented
-            std::reverse(std::begin(x_a), std::end(x_a));
-            std::reverse(std::begin(x_b), std::end(x_b));
-            std::reverse(std::begin(y_a), std::end(y_a));
-            std::reverse(std::begin(y_b), std::end(y_b));
-            // plot traceback paths
             plt::plot(x_a, y_a);
             plt::plot(x_b, y_b, "r--");
             // create linearly spaced vector
-            std::vector<int32_t> lin(abs.size()); // = abe.size()
+            std::vector<int32_t> lin(abs.size()); // abs.size() == abe.size()
             std::iota(lin.begin(), lin.end(), 0);
             // plot start and end of adaptive bands
             plt::plot(abs, lin, "c:");
