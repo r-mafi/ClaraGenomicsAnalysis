@@ -696,7 +696,7 @@ int main(int argc, char* argv[])
     {
         if (parameters.plot_traceback)
         {
-            std::vector<int> x, y;
+            std::vector<int32_t> x, y;
             run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y);
             plt::plot(x, y);
             plt::show();
@@ -736,10 +736,20 @@ int main(int argc, char* argv[])
             std::vector<int32_t> abs, abe; // adaptive_band_start and adaptive_band_end
             run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a, &abs, &abe);
             run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x_b, &y_b);
+            // in traceback it starts from the bottom end corner of matrix, the following block reorders, but it's not necessary and it can be commented
+            std::reverse(std::begin(x_a), std::end(x_a));
+            std::reverse(std::begin(x_b), std::end(x_b));
+            std::reverse(std::begin(y_a), std::end(y_a));
+            std::reverse(std::begin(y_b), std::end(y_b));
+            // plot traceback paths
             plt::plot(x_a, y_a);
             plt::plot(x_b, y_b, "r--");
-            //plt::plot(abs, "c:");
-            //plt::plot(abe, "c:");
+            // create linearly spaced vector
+            std::vector<int32_t> lin(abs.size()); // = abe.size()
+            std::iota(lin.begin(), lin.end(), 0);
+            // plot start and end of adaptive bands
+            plt::plot(abs, lin, "c:");
+            plt::plot(abe, lin, "c:");
             plt::show();
         }
         else

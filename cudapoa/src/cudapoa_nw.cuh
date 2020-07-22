@@ -373,8 +373,8 @@ __device__
         {
             if (collect_traceback)
             {
-                traceback_widths[loop_count]  = i;
-                traceback_heights[loop_count] = j;
+                traceback_heights[loop_count] = i;
+                traceback_widths[loop_count]  = j;
             }
 
             loop_count++;
