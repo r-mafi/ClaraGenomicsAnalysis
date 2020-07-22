@@ -84,8 +84,10 @@ void process_batch(Batch* batch,
                    std::vector<int32_t>* batch_min_bw        = nullptr,
                    std::vector<int32_t>* batch_max_bw        = nullptr,
                    std::vector<int32_t>* batch_avg_bw        = nullptr,
-                   std::vector<int32_t>* x                   = nullptr,
-                   std::vector<int32_t>* y                   = nullptr)
+                   std::vector<int32_t>* traceback_x         = nullptr,
+                   std::vector<int32_t>* traceback_y         = nullptr,
+                   std::vector<int32_t>* band_s              = nullptr,
+                   std::vector<int32_t>* band_e              = nullptr)
 {
     batch->generate_poa(parameters.plot_traceback);
 
@@ -157,16 +159,22 @@ void process_batch(Batch* batch,
                 std::vector<int32_t> min_bw;
                 std::vector<int32_t> max_bw;
                 std::vector<int32_t> avg_bw;
-                batch->get_adaptive_bands(min_bw, max_bw, avg_bw);
+                batch->get_adaptive_bandwidth_stats(min_bw, max_bw, avg_bw);
                 batch_min_bw->insert(batch_min_bw->end(), min_bw.begin(), min_bw.end());
                 batch_max_bw->insert(batch_max_bw->end(), max_bw.begin(), max_bw.end());
                 batch_avg_bw->insert(batch_avg_bw->end(), avg_bw.begin(), avg_bw.end());
             }
         }
 
-        if (parameters.plot_traceback && x != nullptr && y != nullptr)
+        if (parameters.plot_traceback && traceback_x != nullptr && traceback_y != nullptr)
         {
-            batch->get_traceback_path(*x, *y);
+            batch->get_traceback_path(*traceback_x, *traceback_y);
+
+            // for adaptive alignment, in addition to traceback path, extract boundaries of adaptive band
+            if ((parameters.benchmark_mode == 0 || parameters.benchmark_mode == 1) && band_s != nullptr && band_e != nullptr)
+            {
+                batch->get_adaptive_band_boundaries(*band_s, *band_e);
+            }
         }
     }
 }
@@ -232,7 +240,9 @@ void run_cudapoa(const ApplicationParameters& parameters,
                  std::vector<int32_t>* max_band_width = nullptr,
                  std::vector<int32_t>* avg_band_width = nullptr,
                  std::vector<int32_t>* x_plot         = nullptr,
-                 std::vector<int32_t>* y_plot         = nullptr)
+                 std::vector<int32_t>* y_plot         = nullptr,
+                 std::vector<int32_t>* abs_plot       = nullptr,
+                 std::vector<int32_t>* abe_plot       = nullptr)
 {
     bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
     bool band_stats = (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
@@ -319,7 +329,7 @@ void run_cudapoa(const ApplicationParameters& parameters,
                     // No more POA groups can be added to batch. Now process batch
                     timer.start_timer();
                     process_batch(batch.get(), parameters, batch_group_ids, group_count, &batch_consensus,
-                                  &batch_min_bw, &batch_max_bw, &batch_avg_bw, x_plot, y_plot);
+                                  &batch_min_bw, &batch_max_bw, &batch_avg_bw, x_plot, y_plot, abs_plot, abe_plot);
                     compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
@@ -722,11 +732,14 @@ int main(int argc, char* argv[])
 
         if (parameters.plot_traceback)
         {
-            std::vector<int> x_a, x_b, y_a, y_b;
-            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a);
+            std::vector<int32_t> x_a, x_b, y_a, y_b;
+            std::vector<int32_t> abs, abe; // adaptive_band_start and adaptive_band_end
+            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a, &abs, &abe);
             run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x_b, &y_b);
             plt::plot(x_a, y_a);
             plt::plot(x_b, y_b, "r--");
+            //plt::plot(abs, "c:");
+            //plt::plot(abe, "c:");
             plt::show();
         }
         else
