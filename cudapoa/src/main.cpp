@@ -34,6 +34,7 @@ namespace genomeworks
 namespace cudapoa
 {
 
+
 std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                         int32_t gap_score,
                                         int32_t match_score,
@@ -117,6 +118,10 @@ void process_batch(Batch* batch,
                 {
                     for (const auto& alignment : msa[g])
                     {
+                        if(parameters.bonito_long)
+                        {
+                            std::cout << ">" << list_of_group_ids[g + id_offset] <<std::endl;
+                        }
                         std::cout << alignment << std::endl;
                     }
                 }
@@ -146,6 +151,10 @@ void process_batch(Batch* batch,
             {
                 if (parameters.print_output)
                 {
+                    if(parameters.bonito_long)
+                    {
+                        std::cout << ">" << list_of_group_ids[g + id_offset] <<std::endl;
+                    }
                     std::cout << consensus[g] << std::endl;
                 }
             }
@@ -651,7 +660,7 @@ int main(int argc, char* argv[])
     std::vector<std::vector<std::string>> windows;
     if (parameters.all_fasta)
     {
-        parse_fasta_files(windows, parameters.input_paths, parameters.max_groups);
+        parse_fasta_files(windows, parameters.input_paths, parameters.max_groups, parameters.bonito_long);
     }
     else
     {

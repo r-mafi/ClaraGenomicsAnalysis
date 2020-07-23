@@ -148,20 +148,59 @@ inline void parse_cudapoa_file(std::vector<std::vector<std::string>>& windows, c
 /// \param[in] total_windows Limit windows read to total windows, or
 ///                          loop over existing windows to fill remaining spots.
 ///                          -1 ignored the total_windows arg and uses all windows in the file.
-inline void parse_fasta_files(std::vector<std::vector<std::string>>& windows, const std::vector<std::string>& input_paths, const int32_t total_windows)
+inline void parse_fasta_files(std::vector<std::vector<std::string>>& windows, const std::vector<std::string>& input_paths, const int32_t total_windows, bool bonito_long_reads)
 {
     const int32_t min_sequence_length = 0;
     const int32_t num_input_files     = input_paths.size();
     windows.resize(num_input_files);
-    for (int32_t i = 0; i < num_input_files; i++)
+    if(bonito_long_reads)
     {
-        std::shared_ptr<io::FastaParser> fasta_parser = io::create_kseq_fasta_parser(input_paths[i], min_sequence_length, false);
-        int32_t num_reads                             = fasta_parser->get_num_seqences();
-        for (int32_t idx = 0; idx < num_reads; idx++)
+        const int32_t num_input_files        = 6;
+        std::vector<std::shared_ptr<io::FastaParser>> fasta_parser_vec(num_input_files);
+        std::vector<int> num_reads_per_file(num_input_files);
+        for (int32_t i = 0; i < num_input_files; i++)
         {
-            windows[i].push_back(fasta_parser->get_sequence_by_id(idx).seq);
+            fasta_parser_vec[i]   = io::create_kseq_fasta_parser(input_paths[i], min_sequence_length, false);
+            num_reads_per_file[i] = fasta_parser_vec[i]->get_num_seqences();
+        }
+        const int32_t num_reads = num_reads_per_file[0];
+        
+        for(int32_t i = 1; i < num_input_files; i++)
+        {
+            if(num_reads_per_file[i] != num_reads)
+            {
+                assert(false);
+                std::cerr << "Failed to complete long-read sample." << std::endl;
+                std::cerr << "Number of long-reads per input file do not match with each other." << std::endl;
+                return;
+            }
+        }
+
+        windows.resize(num_reads);
+        int32_t idx = 0;
+        for (auto& window: windows)
+        {
+            for(int32_t i = 0; i < num_input_files; i++)
+            {
+                window.push_back(fasta_parser_vec[i]->get_sequence_by_id(idx).seq);
+            }
+            idx++;
         }
     }
+    else
+    {
+        for (int32_t i = 0; i < num_input_files; i++)
+        {
+            std::shared_ptr<io::FastaParser> fasta_parser = io::create_kseq_fasta_parser(input_paths[i], min_sequence_length, false);
+            int32_t num_reads                             = fasta_parser->get_num_seqences();
+            for (int32_t idx = 0; idx < num_reads; idx++)
+            {
+                windows[i].push_back(fasta_parser->get_sequence_by_id(idx).seq);
+            }
+        }
+    }
+    
+    
     resize_windows(windows, total_windows);
 }
 

@@ -51,6 +51,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"help", no_argument, 0, 'h'},
         // for benchmarking
         {"benchmark-mode", required_argument, 0, 'B'},
+        {"bonito-long", required_argument, 0, 'L'},
         {"compact-mode", no_argument, 0, 'C'},
         {"output-fasta", no_argument, 0, 'O'},
         {"plot-traceback", no_argument, 0, 'P'},
@@ -58,7 +59,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhB:COPQ:D:N:";
+    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhLB:COPQ:D:N:";
 
     int32_t argument       = 0;
     bool default_bandwidth = true;
@@ -123,6 +124,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'N':
             max_reads = std::stoi(optarg);
+            break;
+        case 'L':
+            bonito_long = true;
             break;
         case 'v':
             print_version();
@@ -290,6 +294,9 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -N, --max-reads  <int>
             max number of sequences per POA group (must be positive and less than number of reads)[process all])"
+              << R"(
+        -L, --bonito-long
+            set processing mode to bonito-long-read mode. output in fasta format)"
               << R"(
         -v, --version
             version information)"
