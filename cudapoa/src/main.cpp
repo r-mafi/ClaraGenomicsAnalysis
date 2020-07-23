@@ -22,6 +22,9 @@
 #include <spoa/spoa.hpp>
 #include <omp.h>
 
+#include <claraparabricks/genomeworks/cudapoa/matplotlibcpp.h>
+namespace plt = matplotlibcpp;
+
 namespace claraparabricks
 {
 
@@ -39,7 +42,8 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                         bool banded_alignment,
                                         bool adaptive_banded,
                                         const double gpu_mem_allocation,
-                                        const BatchSize& batch_size)
+                                        const BatchSize& batch_size,
+                                        bool plot_traceback = false)
 {
     // Get device information.
     int32_t device_count = 0;
@@ -67,17 +71,30 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                                 mismatch_score,
                                                 match_score,
                                                 banded_alignment,
-                                                adaptive_banded);
+                                                adaptive_banded,
+                                                plot_traceback);
 
     return std::move(batch);
 }
 
-void process_batch(Batch* batch, bool msa_flag, bool print, bool print_fasta, std::vector<int32_t>& list_of_group_ids, int id_offset, std::vector<std::string>* batch_consensus = nullptr)
+void process_batch(Batch* batch,
+                   const ApplicationParameters& parameters,
+                   const std::vector<int32_t>& list_of_group_ids,
+                   const int id_offset,
+                   std::vector<std::string>* batch_consensus = nullptr,
+                   std::vector<int32_t>* batch_min_bw        = nullptr,
+                   std::vector<int32_t>* batch_max_bw        = nullptr,
+                   std::vector<int32_t>* batch_avg_bw        = nullptr,
+                   std::vector<int32_t>* traceback_x         = nullptr,
+                   std::vector<int32_t>* traceback_y         = nullptr,
+                   std::vector<int32_t>* band_s              = nullptr,
+                   std::vector<int32_t>* band_e              = nullptr,
+                   std::vector<int32_t>* max_score_indices   = nullptr)
 {
-    batch->generate_poa();
+    batch->generate_poa(parameters.plot_traceback);
 
     StatusType status = StatusType::success;
-    if (msa_flag)
+    if (parameters.msa)
     {
         // Grab MSA results for all POA groups in batch.
         std::vector<std::vector<std::string>> msa; // MSA per group
@@ -97,11 +114,11 @@ void process_batch(Batch* batch, bool msa_flag, bool print, bool print_fasta, st
             }
             else
             {
-                if (print)
+                if (parameters.print_output)
                 {
                     for (const auto& alignment : msa[g])
                     {
-                        if(print_fasta)
+                        if(parameters.bonito_long)
                         {
                             std::cout << ">" << list_of_group_ids[g + id_offset] <<std::endl;
                         }
@@ -132,9 +149,9 @@ void process_batch(Batch* batch, bool msa_flag, bool print, bool print_fasta, st
             }
             else
             {
-                if (print)
+                if (parameters.print_output)
                 {
-                    if(print_fasta)
+                    if(parameters.bonito_long)
                     {
                         std::cout << ">" << list_of_group_ids[g + id_offset] <<std::endl;
                     }
@@ -146,6 +163,33 @@ void process_batch(Batch* batch, bool msa_flag, bool print, bool print_fasta, st
         if (batch_consensus != nullptr)
         {
             batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
+            // get band-widths stats
+            if ((parameters.benchmark_mode == 0 || parameters.benchmark_mode == 1) && !parameters.compact)
+            {
+                std::vector<int32_t> min_bw;
+                std::vector<int32_t> max_bw;
+                std::vector<int32_t> avg_bw;
+                batch->get_adaptive_bandwidth_stats(min_bw, max_bw, avg_bw);
+                batch_min_bw->insert(batch_min_bw->end(), min_bw.begin(), min_bw.end());
+                batch_max_bw->insert(batch_max_bw->end(), max_bw.begin(), max_bw.end());
+                batch_avg_bw->insert(batch_avg_bw->end(), avg_bw.begin(), avg_bw.end());
+            }
+        }
+
+        if (parameters.plot_traceback && traceback_x != nullptr && traceback_y != nullptr)
+        {
+            batch->get_traceback_path(*traceback_x, *traceback_y);
+
+            // for adaptive alignment, in addition to traceback path, extract boundaries of adaptive band
+            if ((parameters.benchmark_mode != 2) && band_s != nullptr && band_e != nullptr)
+            {
+                batch->get_adaptive_band_boundaries(*band_s, *band_e);
+                // for plotting max score index trace
+                if ((parameters.plot_options == 1 || parameters.plot_options == 3) && max_score_indices != nullptr)
+                {
+                    batch->get_adaptive_max_score_indices(*max_score_indices);
+                }
+            }
         }
     }
 }
@@ -203,14 +247,32 @@ void spoa_compute(const ApplicationParameters& parameters,
     }
 }
 
-void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups,
-                 float& compute_time, std::vector<std::string>* consensus = nullptr)
+void run_cudapoa(const ApplicationParameters& parameters,
+                 const std::vector<Group>& poa_groups,
+                 float& compute_time,
+                 std::vector<std::string>* consensus  = nullptr,
+                 std::vector<int32_t>* min_band_width = nullptr,
+                 std::vector<int32_t>* max_band_width = nullptr,
+                 std::vector<int32_t>* avg_band_width = nullptr,
+                 std::vector<int32_t>* x_plot         = nullptr,
+                 std::vector<int32_t>* y_plot         = nullptr,
+                 std::vector<int32_t>* abs_plot       = nullptr,
+                 std::vector<int32_t>* abe_plot       = nullptr,
+                 std::vector<int32_t>* max_idx_plot   = nullptr)
 {
-    bool benchmark = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    bool band_stats = (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
+    band_stats      = band_stats && !parameters.compact && benchmark && (parameters.benchmark_mode < 2);
     ChronoTimer timer;
     if (benchmark)
     {
         consensus->resize(poa_groups.size());
+        if (band_stats)
+        {
+            min_band_width->resize(poa_groups.size());
+            max_band_width->resize(poa_groups.size());
+            avg_band_width->resize(poa_groups.size());
+        }
     }
     // analyze the POA groups and create a minimal set of batches to process them all
     std::vector<BatchSize> list_of_batch_sizes;
@@ -228,8 +290,6 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                           parameters.mismatch_score,
                           parameters.gap_score,
                           parameters.match_score);
-
-    bool print = parameters.benchmark_mode == -1;
 
     std::ofstream graph_output;
     if (!parameters.graph_output_path.empty())
@@ -251,6 +311,9 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
 
         // for storing benchmark results
         std::vector<std::string> batch_consensus;
+        std::vector<int32_t> batch_min_bw;
+        std::vector<int32_t> batch_max_bw;
+        std::vector<int32_t> batch_avg_bw;
 
         // Initialize batch.
         std::unique_ptr<Batch> batch = initialize_batch(parameters.mismatch_score,
@@ -260,7 +323,8 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                                                         parameters.banded,
                                                         parameters.adaptive,
                                                         parameters.gpu_mem_allocation,
-                                                        batch_size);
+                                                        batch_size,
+                                                        parameters.plot_traceback);
 
         // Loop over all the POA groups for the current batch, add them to the batch and process them.
         int32_t group_count = 0;
@@ -280,7 +344,8 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 {
                     // No more POA groups can be added to batch. Now process batch
                     timer.start_timer();
-                    process_batch(batch.get(), parameters.msa, print, parameters.bonito_long, batch_group_ids, group_count, &batch_consensus);
+                    process_batch(batch.get(), parameters, batch_group_ids, group_count, &batch_consensus,
+                                  &batch_min_bw, &batch_max_bw, &batch_avg_bw, x_plot, y_plot, abs_plot, abe_plot, max_idx_plot);
                     compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
@@ -321,6 +386,12 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                     if (benchmark)
                     {
                         batch_consensus.push_back("");
+                        if (band_stats)
+                        {
+                            batch_min_bw.push_back(-1);
+                            batch_max_bw.push_back(-1);
+                            batch_avg_bw.push_back(-1);
+                        }
                     }
                 }
 
@@ -347,6 +418,12 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 if (benchmark)
                 {
                     batch_consensus.push_back("");
+                    if (band_stats)
+                    {
+                        batch_min_bw.push_back(-1);
+                        batch_max_bw.push_back(-1);
+                        batch_avg_bw.push_back(-1);
+                    }
                 }
             }
         }
@@ -355,11 +432,17 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
 
         if (benchmark)
         {
-            // add batch results to the global results vector
+            // add batch results to the global results vectors
             for (int32_t i = 0; i < get_size<int32_t>(batch_group_ids); i++)
             {
                 int id            = batch_group_ids[i];
                 consensus->at(id) = batch_consensus[i];
+                if (band_stats)
+                {
+                    min_band_width->at(id) = batch_min_bw[i];
+                    max_band_width->at(id) = batch_max_bw[i];
+                    avg_band_width->at(id) = batch_avg_bw[i];
+                }
             }
         }
     }
@@ -368,7 +451,8 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
 // print benchmarking report
 void print_benchmark_report(const ApplicationParameters& parameters, const std::vector<Group>& poa_groups,
                             const float compute_time_a, const float compute_time_b,
-                            const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b)
+                            const std::vector<std::string>& consensus_a, const std::vector<std::string>& consensus_b,
+                            const std::vector<int32_t>& min_bw, const std::vector<int32_t>& max_bw, const std::vector<int32_t>& avg_bw)
 {
     int32_t number_of_groups = get_size<int32_t>(poa_groups);
     bool verbose             = !parameters.compact;
@@ -377,23 +461,23 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     if (parameters.benchmark_mode == 0)
     {
         method_a = "adaptive ";
-        method_b = "banded   ";
+        method_b = "banded ";
     }
     else if (parameters.benchmark_mode == 1)
     {
         method_a = "adaptive ";
-        method_b = "full     ";
+        method_b = "full ";
     }
-    else if (parameters.benchmark_mode == 1)
+    else if (parameters.benchmark_mode == 2)
     {
-        method_a = "banded   ";
-        method_b = "full     ";
+        method_a = "banded ";
+        method_b = "full ";
     }
 
     std::cerr << "\nbenchmark summary: ";
-    std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
+    std::cerr << method_a << "alignment vs " << method_b << "alignment\n";
     std::cerr << "=============================================================================================================\n";
-    std::cerr << "Compute time (sec):             " << method_a << std::left << std::setw(17);
+    std::cerr << "Compute time (sec):               " << method_a << std::left << std::setw(17);
     std::cerr << std::fixed << std::setprecision(2) << compute_time_a;
     std::cerr << method_b << std::left << std::setw(15) << std::fixed << std::setprecision(2) << compute_time_b;
     std::cerr << "Number of groups " << number_of_groups << std::endl;
@@ -409,7 +493,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     }
     float perf_a = (float)actual_number_of_bases / compute_time_a;
     float perf_b = (float)actual_number_of_bases / compute_time_b;
-    std::cerr << "Performance (bases/sec):        " << method_a << std::left << std::setw(16);
+    std::cerr << "Performance (bases/sec):          " << method_a << std::left << std::setw(16);
     std::cerr << std::fixed << std::setprecision(2) << std::scientific << perf_a << " ";
     std::cerr << method_b << std::left << std::setw(15) << perf_b;
     if (perf_a > perf_b)
@@ -432,14 +516,31 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
         sum_consensus_length_b += consensus_lengths_b[i];
     }
 
+    std::vector<int> min_seq_length(number_of_groups);
+    std::vector<int> max_seq_length(number_of_groups);
+    std::vector<int> avg_seq_length(number_of_groups);
+
     if (verbose)
     {
         float similarity_percentage;
         for (int i = 0; i < number_of_groups; i++)
         {
-            int width = i < 9 ? 4 : i < 99 ? 3 : i < 999 ? 2 : 1;
-            std::cerr << "Consensus length for group " << i + 1 << std::left << std::setw(width) << ":" << method_a;
-            std::cerr << std::left << std::setw(17) << consensus_lengths_a[i];
+            // first find min, max and avg sequence length in the group
+            int min_sz = std::numeric_limits<int>::max(), max_sz = 0, avg_sz = 0;
+            const auto& group = poa_groups[i];
+            for (const auto& seq : group)
+            {
+                min_sz = std::min(min_sz, seq.length);
+                max_sz = std::max(max_sz, seq.length);
+                avg_sz = avg_sz + seq.length;
+            }
+            min_seq_length[i] = min_sz;
+            max_seq_length[i] = max_sz;
+            avg_seq_length[i] = avg_sz = avg_sz / get_size<int>(group);
+
+            std::cerr << "G " << std::left << std::setw(3) << i << " (" << std::left << std::setw(6) << min_sz << ", ";
+            std::cerr << std::left << std::setw(6) << max_sz << ", " << std::left << std::setw(6) << avg_sz << std::left << std::setw(5) << ")";
+            std::cerr << method_a << std::left << std::setw(17) << consensus_lengths_a[i];
             std::cerr << method_b << std::left << std::setw(15) << consensus_lengths_b[i];
             similarity_percentage = 100.0f * (1.0f - (float)abs(consensus_lengths_a[i] - consensus_lengths_b[i]) / (float)consensus_lengths_b[i]);
             std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << similarity_percentage << "% similar length";
@@ -473,43 +574,43 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
         spoa_compute(parameters, consensus_results, omp_get_num_procs(), true, msa_for_ab, dummy);
 
         // print comparison details between method a and b consensus per window
-        for (int g = 0; g < get_size(msa_for_ab); g++)
+        for (int i = 0; i < get_size(msa_for_ab); i++)
         {
             int insert_cntr   = 0;
             int delete_cntr   = 0;
             int mismatch_cntr = 0;
             int identity_cntr = 0;
 
-            int width = g < 9 ? 9 : g < 99 ? 8 : g < 999 ? 7 : 6;
-            std::cerr << "Differences for group " << g + 1 << std::left << std::setw(width) << ":";
+            std::cerr << "G " << std::left << std::setw(3) << i << " (" << std::left << std::setw(6) << min_seq_length[i] << ", ";
+            std::cerr << std::left << std::setw(6) << max_seq_length[i] << ", " << std::left << std::setw(6) << avg_seq_length[i] << std::left << std::setw(5) << ")";
 
-            if (msa_for_ab[g].size() == 2)
+            if (msa_for_ab[i].size() == 2)
             {
-                const auto& target = msa_for_ab[g][0];
-                const auto& query  = msa_for_ab[g][1];
+                const auto& target = msa_for_ab[i][1];
+                const auto& query  = msa_for_ab[i][0];
                 if (target.length() == query.length())
                 {
-                    for (int i = 0; i < target.length(); i++)
+                    for (int j = 0; j < target.length(); j++)
                     {
-                        if (target[i] == '-')
+                        if (target[j] == '-')
                             insert_cntr++;
-                        else if (query[i] == '-')
+                        else if (query[j] == '-')
                             delete_cntr++;
-                        else if (target[i] != query[i])
+                        else if (target[j] != query[j])
                             mismatch_cntr++;
-                        else /*target[i] == query[i]*/
+                        else /*target[j] == query[j]*/
                             identity_cntr++;
                     }
-                    float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
+                    float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[i], consensus_lengths_a[i]));
 
                     std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(13) << delete_cntr;
-                    std::cerr << "mismatches " << std::left << std::setw(13) << mismatch_cntr;
+                    std::cerr << "mismatches " << std::left << std::setw(11) << mismatch_cntr;
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
                 }
                 else
                 {
                     std::cerr << "indels  " << std::left << std::setw(18) << "--------";
-                    std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                    std::cerr << "mismatches " << std::left << std::setw(11) << "---";
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
                               << "% identity " << std::endl;
                 }
@@ -517,9 +618,31 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             else
             {
                 std::cerr << "indels  " << std::left << std::setw(18) << "--------";
-                std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                std::cerr << "mismatches " << std::left << std::setw(11) << "---";
                 std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
                           << "% identity " << std::endl;
+            }
+        }
+
+        if (parameters.benchmark_mode != 2)
+        {
+            //print band-width stats
+            std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
+
+            for (int i = 0; i < get_size<int>(min_bw); i++)
+            {
+                int width = i < 10 ? 6 : i < 100 ? 5 : i < 1000 ? 4 : 3;
+                std::cerr << "Band-width stats for group " << i << std::left << std::setw(width) << ":";
+                std::cerr << min_bw[i] << " / " << max_bw[i] << " / " << avg_bw[i];
+                if (parameters.benchmark_mode == 0)
+                {
+                    std::cerr << "           " << parameters.band_width;
+                }
+                else
+                {
+                    std::cerr << "          ---";
+                }
+                std::cerr << std::endl;
             }
         }
     }
@@ -572,10 +695,16 @@ int main(int argc, char* argv[])
     std::vector<Group> poa_groups(windows.size());
     for (int32_t i = 0; i < get_size(windows); ++i)
     {
-        Group& group = poa_groups[i];
-        // Create a new entry for each sequence and add to the group.
-        for (const auto& seq : windows[i])
+        Group& group      = poa_groups[i];
+        int max_num_reads = get_size(windows[i]);
+        if (parameters.max_reads > 0)
         {
+            max_num_reads = std::min(max_num_reads, parameters.max_reads);
+        }
+        // Create a new entry for each sequence and add to the group.
+        for (int s = 0; s < max_num_reads; s++)
+        {
+            const auto& seq = windows[i][s];
             Entry poa_entry{};
             poa_entry.seq     = seq.c_str();
             poa_entry.length  = seq.length();
@@ -589,10 +718,39 @@ int main(int argc, char* argv[])
     float time_b = 0.f;
     std::vector<std::string> consensus_a;
     std::vector<std::string> consensus_b;
+    // to record min/max and average width of adaptive bands
+    std::vector<int32_t> min_band_width_a;
+    std::vector<int32_t> max_band_width_a;
+    std::vector<int32_t> avg_band_width_a;
 
     if (parameters.benchmark_mode == -1)
     {
-        run_cudapoa(parameters, poa_groups, time_a);
+        if (parameters.plot_traceback)
+        {
+            if (parameters.adaptive)
+            {
+                std::vector<int32_t> x, y;
+                std::vector<int32_t> abs, abe;
+                run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y, &abs, &abe);
+                std::vector<int32_t> lin(abs.size());
+                std::iota(lin.begin(), lin.end(), 0);
+                plt::plot(x, y);
+                plt::plot(abs, lin, "c:");
+                plt::plot(abe, lin, "c:");
+                plt::show();
+            }
+            else
+            {
+                std::vector<int32_t> x, y;
+                run_cudapoa(parameters, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x, &y);
+                plt::plot(x, y);
+                plt::show();
+            }
+        }
+        else
+        {
+            run_cudapoa(parameters, poa_groups, time_a);
+        }
     }
     else
     {
@@ -618,13 +776,59 @@ int main(int argc, char* argv[])
             parameters_b.banded   = false;
         }
 
-        run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a);
-        run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
+        if (parameters.plot_traceback)
+        {
+            std::vector<int32_t> x_a, x_b, y_a, y_b; // x and y coordinates of traceback path for alignment A and B
+            std::vector<int32_t> abs, abe;           // adaptive_band_start and adaptive_band_end
+            std::vector<int32_t> max_scroe_idx;      // index of maximum score per node in adaptive score matrix
+            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a, &abs, &abe, &max_scroe_idx);
+            run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x_b, &y_b);
+            plt::plot(x_a, y_a);
+            plt::plot(x_b, y_b, "r--");
+            // create linearly spaced vector
+            std::vector<int32_t> lin(abs.size()); // abs.size() == abe.size()
+            std::iota(lin.begin(), lin.end(), 0);
+            // plot start and end of adaptive bands ---------------
+            plt::plot(abs, lin, "c:");
+            plt::plot(abe, lin, "c:");
+            // additional plot options ---------------------------
+            if (parameters.plot_options != -1)
+            {
+                if (parameters.plot_options == 0 || parameters.plot_options == 3)
+                {
+                    int32_t height = *(std::max_element(y_a.begin(), y_a.end()));
+                    int32_t width  = *(std::max_element(x_a.begin(), x_a.end()));
+                    std::vector<int32_t> diagonal(width);
+                    for (int i = 0; i < width; i++)
+                    {
+                        diagonal[i] = height * i / width;
+                    }
+                    plt::plot(diagonal, "y:");
+                }
+                if (parameters.plot_options == 1 || parameters.plot_options == 3)
+                {
+                    lin.resize(max_scroe_idx.size());
+                    std::iota(lin.begin(), lin.end(), 0);
+                    plt::plot(max_scroe_idx, lin, "y--");
+                }
+                if (parameters.plot_options == 2 || parameters.plot_options == 3)
+                {
+                    plt::axis("equal");
+                }
+            }
+
+            plt::show();
+        }
+        else
+        {
+            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a);
+            run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
+        }
     }
 
     if (parameters.benchmark_mode > -1)
     {
-        print_benchmark_report(parameters, poa_groups, time_a, time_b, consensus_a, consensus_b);
+        print_benchmark_report(parameters, poa_groups, time_a, time_b, consensus_a, consensus_b, min_band_width_a, max_band_width_a, avg_band_width_a);
     }
 
     return 0;

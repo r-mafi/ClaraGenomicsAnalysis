@@ -165,7 +165,7 @@ public:
     virtual int32_t get_total_poas() const = 0;
 
     /// \brief Run partial order alignment algorithm over all POAs.
-    virtual void generate_poa() = 0;
+    virtual void generate_poa(bool plot_traceback = false) = 0;
 
     /// \brief Get the consensus for each POA.
     ///
@@ -201,6 +201,35 @@ public:
     virtual void get_graphs(std::vector<DirectedGraph>& graphs,
                             std::vector<StatusType>& output_status) = 0;
 
+    /// \brief Used in benchmark mode, extracts min, max and average band-width per POA for
+    /// adaptive-banded alignment. These values are from aligning the last sequence of POA group to the graph
+    ///
+    /// \param min_band_width   minimum band-width in adaptive alignment
+    /// \param max_band_width   maximum band-width in adaptive alignment
+    /// \param avg_band_width   average band-width in adaptive alignment
+    virtual StatusType get_adaptive_bandwidth_stats(std::vector<int32_t>& min_band_width,
+                                                    std::vector<int32_t>& max_band_width,
+                                                    std::vector<int32_t>& avg_band_width) = 0;
+
+    /// \brief Used in benchmark mode, used to plot adaptive band head and tail per node
+    ///
+    /// \param band_start   start index of adaptive band per node
+    /// \param band_end     end index of adaptive band per node
+    virtual StatusType get_adaptive_band_boundaries(std::vector<int32_t>& band_start,
+                                                    std::vector<int32_t>& band_end) = 0;
+
+    /// \brief Used in benchmark mode, used to plot maximum scores trace in adaptive banding
+    ///
+    /// \param max_indices   max score index per node
+    virtual StatusType get_adaptive_max_score_indices(std::vector<int32_t>& max_score_indices) = 0;
+
+    /// \brief Used in benchmark mode, used to plot traceback path and is available only for a single POA group
+    ///
+    /// \param x   x-coordinates of the tracepack path
+    /// \param y   y-coordinates of the tracepack path
+    virtual StatusType get_traceback_path(std::vector<int32_t>& x,
+                                          std::vector<int32_t>& y) = 0;
+
     /// \brief Return batch ID.
     ///
     /// \return Batch ID
@@ -233,7 +262,8 @@ std::unique_ptr<Batch> create_batch(int32_t device_id,
                                     int16_t mismatch_score,
                                     int16_t match_score,
                                     bool cuda_banded_alignment,
-                                    bool cuda_adaptive_alignment);
+                                    bool cuda_adaptive_alignment,
+                                    bool plot_traceback = false);
 
 /// \}
 

@@ -117,6 +117,7 @@ __device__ ScoreT get_score_adaptive(ScoreT* scores, SizeT row, SizeT column, Si
 {
     SizeT band_start = band_starts[row];
     SizeT band_end   = band_start + band_widths[row];
+    band_end = min(band_end, max_column);
 
     if ((column > band_end || column < band_start) && column != -1)
     {
@@ -153,6 +154,7 @@ __device__ ScoreT4<ScoreT> get_scores_adaptive(ScoreT* scores,
 
     // subtract by CELLS_PER_THREAD to ensure score4_next is not pointing out of the corresponding band bounds
     SizeT band_end = static_cast<SizeT>(band_start + band_widths[row] - CELLS_PER_THREAD);
+    band_end = min(band_end, max_column);
 
     if ((column > band_end || column < band_start) && column != -1)
     {
@@ -203,7 +205,6 @@ __device__ void warp_reduce_max(ScoreT& val, SizeT& idx)
 template <typename ScoreT, typename SizeT>
 __device__ void get_predecessors_max_score_index(SizeT& pred_max_score_left,
                                                  SizeT& pred_max_score_right,
-                                                 SizeT row,
                                                  SizeT node_id,
                                                  ScoreT* scores,
                                                  SizeT* node_id_to_pos,
@@ -213,6 +214,7 @@ __device__ void get_predecessors_max_score_index(SizeT& pred_max_score_left,
                                                  uint16_t* incoming_edge_count,
                                                  SizeT* incoming_edges,
                                                  int64_t* head_indices,
+                                                 SizeT max_column,
                                                  ScoreT min_score_value)
 {
     for (uint16_t p = 0; p < incoming_edge_count[node_id]; p++)
@@ -231,7 +233,7 @@ __device__ void get_predecessors_max_score_index(SizeT& pred_max_score_left,
 
             for (SizeT index = lane_idx; index < band_width; index += WARP_SIZE)
             {
-                ScoreT score_val = scores[static_cast<int64_t>(index) + head_index];
+                ScoreT score_val = index > max_column? min_score_value : scores[static_cast<int64_t>(index) + head_index];
                 SizeT score_idx  = index + band_start;
                 warp_reduce_max(score_val, score_idx);
                 score_val = __shfl_sync(FULL_MASK, score_val, 0);
@@ -290,28 +292,30 @@ __device__
 }
 
 template <typename SizeT, typename ScoreT>
-__device__ void set_band_parameters(ScoreT* scores,
-                                    SizeT* band_starts,
-                                    SizeT* band_widths,
-                                    int64_t* head_indices,
-                                    SizeT* max_indices,
-                                    uint16_t* incoming_edge_count,
-                                    SizeT* incoming_edges,
-                                    SizeT* node_distances,
-                                    SizeT* node_id_to_pos,
-                                    int64_t& head_index,
-                                    SizeT node_id,
-                                    SizeT row,
-                                    SizeT max_column,
-                                    SizeT graph_length,
-                                    float gradient,
-                                    ScoreT min_score_value)
+__device__ SizeT set_band_parameters(ScoreT* scores,
+                                     int64_t scores_size,
+                                     SizeT* band_starts,
+                                     SizeT* band_widths,
+                                     int64_t* head_indices,
+                                     SizeT* max_indices,
+                                     uint16_t* incoming_edge_count,
+                                     SizeT* incoming_edges,
+                                     SizeT* node_distances,
+                                     SizeT* node_id_to_pos,
+                                     int64_t& head_index,
+                                     SizeT node_id,
+                                     SizeT row,
+                                     SizeT max_column,
+                                     SizeT graph_length,
+                                     float gradient,
+                                     ScoreT min_score_value)
 {
+    SizeT err                  = 0;
     SizeT pred_max_score_left  = max_column;
     SizeT pred_max_score_right = 0;
 
-    get_predecessors_max_score_index(pred_max_score_left, pred_max_score_right, row, node_id, scores, node_id_to_pos, max_indices, band_widths,
-                                     band_starts, incoming_edge_count, incoming_edges, head_indices, min_score_value);
+    get_predecessors_max_score_index(pred_max_score_left, pred_max_score_right, node_id, scores, node_id_to_pos, max_indices, band_widths,
+                                     band_starts, incoming_edge_count, incoming_edges, head_indices, max_column, min_score_value);
 
     SizeT node_distance_i = node_distances[node_id];
 
@@ -363,6 +367,12 @@ __device__ void set_band_parameters(ScoreT* scores,
 
     // update head_index for the nex row
     head_index += static_cast<int64_t>(band_width + CUDAPOA_BANDED_MATRIX_RIGHT_PADDING);
+    if (head_index > scores_size)
+    {
+        // If current end of band is greater than allocated scores' size, return error
+        err = -2;
+    }
+    return err;
 }
 
 template <typename SeqT,
@@ -380,6 +390,7 @@ __device__
                                      SeqT* read,
                                      SizeT read_length,
                                      ScoreT* scores,
+                                     int64_t scores_size,
                                      SizeT* alignment_graph,
                                      SizeT* alignment_read,
                                      SizeT* node_distances,
@@ -387,6 +398,9 @@ __device__
                                      SizeT* band_widths,
                                      int64_t* head_indices,
                                      SizeT* max_indices,
+                                     SizeT* traceback_widths,
+                                     SizeT* traceback_heights,
+                                     bool collect_traceback,
                                      SizeT static_band_width,
                                      ScoreT gap_score,
                                      ScoreT mismatch_score,
@@ -446,8 +460,12 @@ __device__
         SizeT node_id    = graph[graph_pos];
         SizeT score_gIdx = graph_pos + 1;
 
-        set_band_parameters(scores, band_starts, band_widths, head_indices, max_indices, incoming_edge_count, incoming_edges, node_distances,
-                            node_id_to_pos, head_index_of_next_row, node_id, score_gIdx, max_column, graph_count, gradient, min_score_value);
+        SizeT err = set_band_parameters(scores, scores_size, band_starts, band_widths, head_indices, max_indices, incoming_edge_count, incoming_edges, node_distances,
+                                        node_id_to_pos, head_index_of_next_row, node_id, score_gIdx, max_column, graph_count, gradient, min_score_value);
+        if (err)
+        {
+            return err;
+        }
 
         SizeT band_start = band_starts[score_gIdx];
 
@@ -559,6 +577,9 @@ __device__
     SizeT aligned_nodes = 0;
     if (lane_idx == 0)
     {
+        // mark end of band-width array
+        band_widths[graph_count + 1] = -1;
+
         // Find location of the maximum score in the matrix.
         SizeT i       = 0;
         SizeT j       = read_length;
@@ -584,13 +605,18 @@ __device__
         int32_t loop_count = 0;
         while (!(i == 0 && j == 0) && loop_count < static_cast<int32_t>(read_length + graph_count + 2))
         {
+            if (collect_traceback)
+            {
+                traceback_heights[loop_count] = i;
+                traceback_widths[loop_count]  = j;
+            }
+
             loop_count++;
             ScoreT scores_ij = get_score_adaptive(scores, i, j, band_starts, band_widths, head_indices, max_column, min_score_value);
             bool pred_found  = false;
             // Check if move is diagonal.
             if (i != 0 && j != 0)
             {
-
                 SizeT node_id     = graph[i - 1];
                 ScoreT match_cost = (nodes[node_id] == read[j - 1] ? match_score : mismatch_score);
 

@@ -47,18 +47,22 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"mismatch", required_argument, 0, 'n'},
         {"gap", required_argument, 0, 'g'},
         {"version", no_argument, 0, 'v'},
+        {"print-output", no_argument, 0, 'p'},
         {"help", no_argument, 0, 'h'},
         // for benchmarking
         {"benchmark-mode", required_argument, 0, 'B'},
         {"bonito-long", required_argument, 0, 'L'},
         {"compact-mode", no_argument, 0, 'C'},
         {"output-fasta", no_argument, 0, 'O'},
+        {"plot-traceback", no_argument, 0, 'P'},
+        {"plot-options", required_argument, 0, 'Q'},
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Ad:M:R:m:n:g:vhLB:COD:N:";
+    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhLB:COPQ:D:N:";
 
-    int32_t argument = 0;
+    int32_t argument       = 0;
+    bool default_bandwidth = true;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
     {
         switch (argument)
@@ -73,10 +77,14 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             banded = false;
             break;
         case 'b':
-            band_width = std::stoi(optarg);
+            band_width        = std::stoi(optarg);
+            default_bandwidth = false;
             break;
         case 'A':
             adaptive = true;
+            break;
+        case 'p':
+            print_output = true;
             break;
         case 'd':
             graph_output_path = std::string(optarg);
@@ -105,6 +113,12 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         case 'O':
             output_fasta = true;
             break;
+        case 'P':
+            plot_traceback = true;
+            break;
+        case 'Q':
+            plot_options = std::stoi(optarg);
+            break;
         case 'D':
             single_window = std::stoi(optarg);
             break;
@@ -131,6 +145,17 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
     if (banded && band_width < 1)
     {
         throw std::runtime_error("band-width must be positive");
+    }
+
+    if (!banded && adaptive)
+    {
+        throw std::runtime_error("adaptive alignment cannot run with full alignment");
+    }
+
+    if (adaptive && default_bandwidth)
+    {
+        // this is used to determine total score matrix size in adaptive-banded alignment
+        band_width = 2048;
     }
 
     if (match_score < 0)
@@ -161,6 +186,11 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
     if (benchmark_mode > -1 && !graph_output_path.empty())
     {
         throw std::runtime_error("graph output is not available in benchmark mode");
+    }
+
+    if (plot_traceback && single_window < 0)
+    {
+        throw std::runtime_error("plot-traceback is only available for a single POA group and should be used with option -D");
     }
 
     verify_input_files(input_paths);
@@ -222,6 +252,9 @@ void ApplicationParameters::help(int32_t exit_code)
         -A, --adaptive-alignment
             uses adaptive alignment if this flag is passed [banded alignment])"
               << R"(
+        -p, --print-output
+            prints consensus/MSA output [disabled])"
+              << R"(
         -d, --dot <file>
             output path for printing graph in DOT format [disabled])"
               << R"(
@@ -249,6 +282,12 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -O, --output-fasta
             output reads in fasta format and exits the application [disabled])"
+              << R"(
+        -P, --plot-traceback
+            plots the traceback path for a single group, this option should be used with option -D [disabled])"
+              << R"(
+        -Q, --plot-options  <int>
+            additional options for plot, [0] plots diagonal, [1] plots max index, [2] axis equal, [3] all the options, default [-1])"
               << R"(
         -D, --single-window  <int>
             selects a single POA group instead of all input groups (must be positive and within the range of number of groups) [process all])"

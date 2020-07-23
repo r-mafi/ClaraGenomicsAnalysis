@@ -167,6 +167,9 @@ __device__
                        int32_t scores_width,
                        SizeT* alignment_graph,
                        SizeT* alignment_read,
+                       SizeT* traceback_widths,
+                       SizeT* traceback_heights,
+                       bool collect_traceback,
                        ScoreT gap_score,
                        ScoreT mismatch_score,
                        ScoreT match_score)
@@ -368,6 +371,12 @@ __device__
         int32_t loop_count = 0;
         while (!(i == 0 && j == 0) && loop_count < static_cast<int32_t>(read_length + graph_count + 2))
         {
+            if (collect_traceback)
+            {
+                traceback_heights[loop_count] = i;
+                traceback_widths[loop_count]  = j;
+            }
+
             loop_count++;
             score_index      = static_cast<int64_t>(i) * static_cast<int64_t>(scores_width) + static_cast<int64_t>(j);
             ScoreT scores_ij = scores[score_index];
@@ -506,6 +515,9 @@ __global__ void runNeedlemanWunschKernel(uint8_t* nodes,
                                                                  scores_width,
                                                                  alignment_graph,
                                                                  alignment_read,
+                                                                 nullptr,
+                                                                 nullptr,
+                                                                 false,
                                                                  gap_score,
                                                                  mismatch_score,
                                                                  match_score);

@@ -65,7 +65,7 @@ class CudapoaBatch : public Batch
 public:
     CudapoaBatch(int32_t device_id, cudaStream_t stream, size_t max_mem, int8_t output_mask,
                  const BatchSize& batch_size, ScoreT gap_score = -8, ScoreT mismatch_score = -6, ScoreT match_score = 8,
-                 bool cuda_banded_alignment = false, bool cuda_adaptive_banding = false)
+                 bool cuda_banded_alignment = false, bool cuda_adaptive_banding = false, bool plot_traceback = false)
         : max_sequences_per_poa_(throw_on_negative(batch_size.max_sequences_per_poa, "Maximum sequences per POA has to be non-negative"))
         , device_id_(throw_on_negative(device_id, "Device ID has to be non-negative"))
         , stream_(stream)
@@ -80,7 +80,9 @@ public:
                                                      max_mem,
                                                      output_mask,
                                                      batch_size_,
-                                                     cuda_banded_alignment, cuda_adaptive_banding))
+                                                     cuda_banded_alignment,
+                                                     cuda_adaptive_banding,
+                                                     plot_traceback))
         , max_poas_(batch_block_->get_max_poas())
     {
         // Set CUDA device
@@ -156,7 +158,7 @@ public:
     }
 
     // Run partial order alignment algorithm over all POAs.
-    void generate_poa()
+    void generate_poa(bool plot_traceback = false)
     {
         scoped_device_switch dev(device_id_);
 
@@ -193,7 +195,8 @@ public:
                                    adaptive_banding_,
                                    max_sequences_per_poa_,
                                    output_mask_,
-                                   batch_size_);
+                                   batch_size_,
+                                   plot_traceback);
 
         msg = " Launched kernel on device ";
         print_batch_debug_message(msg);
@@ -393,6 +396,224 @@ public:
         }
     }
 
+    // Get the consensus for each POA.
+    StatusType get_adaptive_bandwidth_stats(std::vector<int32_t>& min_band_width,
+                                            std::vector<int32_t>& max_band_width,
+                                            std::vector<int32_t>& avg_band_width)
+    {
+        // Check if adaptive banding was requested at init time.
+        if (!adaptive_banding_)
+        {
+            return StatusType::output_type_unavailable;
+        }
+
+        SizeT* band_widths_h;
+        // Allocate.
+        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_window_banded * sizeof(*band_widths_h);
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_widths_h, bw_sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(band_widths_h,
+                                        alignment_details_d_->band_widths,
+                                        bw_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        min_band_width.resize(poa_count_);
+        max_band_width.resize(poa_count_);
+        avg_band_width.resize(poa_count_);
+
+        for (int32_t poa = 0; poa < poa_count_; poa++)
+        {
+            int32_t bw     = 0;
+            int32_t offset = poa * batch_size_.max_nodes_per_window_banded;
+
+            int32_t min_width = batch_size_.max_matrix_sequence_dimension;
+            int32_t max_width = 0;
+            int32_t sum_width = 0;
+            int32_t num_rows  = 0;
+
+            // ignore the first row, since it's just based on static band-width
+            for (int32_t i = 1; i < batch_size_.max_nodes_per_window_banded; i++)
+            {
+                bw = band_widths_h[offset + i];
+                if (bw < 0)
+                {
+                    num_rows = i - 1;
+                    break;
+                }
+                min_width = bw < min_width ? bw : min_width;
+                max_width = bw > max_width ? bw : max_width;
+                sum_width += bw;
+            }
+
+            if (num_rows > 0)
+            {
+                min_band_width[poa] = min_width;
+                max_band_width[poa] = max_width;
+                avg_band_width[poa] = sum_width / num_rows;
+            }
+        }
+
+        return StatusType::success;
+    }
+
+    StatusType get_adaptive_band_boundaries(std::vector<int32_t>& band_start,
+                                            std::vector<int32_t>& band_end)
+    {
+        // This kernel is used to plot adaptive band ends and is available only for a single POA group
+        if (!adaptive_banding_ || poa_count_ > 1)
+        {
+            return StatusType::output_type_unavailable;
+        }
+
+        SizeT* band_starts_h;
+        SizeT* band_widths_h;
+        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_window_banded * sizeof(*band_widths_h);
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_starts_h, bw_sz, cudaHostAllocDefault));
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_widths_h, bw_sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(band_starts_h,
+                                        alignment_details_d_->band_starts,
+                                        bw_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(band_widths_h,
+                                        alignment_details_d_->band_widths,
+                                        bw_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        band_start.reserve(batch_size_.max_nodes_per_window_banded);
+        band_end.reserve(batch_size_.max_nodes_per_window_banded);
+
+        int bw = 0;
+
+        for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+        {
+            bw = band_widths_h[i];
+            if (bw < 0)
+            {
+                break;
+            }
+            band_start.push_back(band_starts_h[i]);
+            band_end.push_back(band_starts_h[i] + bw);
+        }
+
+        return StatusType::success;
+    }
+
+    StatusType get_adaptive_max_score_indices(std::vector<int32_t>& max_score_indices)
+    {
+        // This kernel is used to plot adaptive band ends and is available only for a single POA group
+        if (!adaptive_banding_ || poa_count_ > 1)
+        {
+            return StatusType::output_type_unavailable;
+        }
+
+        SizeT* max_score_index_h;
+        size_t sz = batch_size_.max_nodes_per_window_banded * sizeof(*max_score_index_h);
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&max_score_index_h, sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(max_score_index_h,
+                                        alignment_details_d_->band_max_indices,
+                                        sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        max_score_indices.reserve(batch_size_.max_nodes_per_window_banded);
+        int32_t id = -1;
+
+        for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+        {
+            id = max_score_index_h[i];
+            if (id < 0)
+            {
+                break;
+            }
+            max_score_indices.push_back(id);
+        }
+
+        return StatusType::success;
+    }
+
+    // Get the consensus for each POA.
+    StatusType get_traceback_path(std::vector<int32_t>& x,
+                                  std::vector<int32_t>& y)
+    {
+        // This kernel is used to plot traceback path and is available only for a single POA group
+        if (poa_count_ > 1)
+            return StatusType::output_type_unavailable;
+
+        SizeT* traceback_height_h;
+        SizeT* traceback_width_h;
+        // Allocate host memory
+        int32_t max_dim  = 2 * batch_size_.max_nodes_per_window_banded;
+        size_t height_sz = max_dim * sizeof(*traceback_height_h);
+        size_t width_sz  = max_dim * sizeof(*traceback_width_h);
+
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&traceback_height_h, height_sz, cudaHostAllocDefault));
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&traceback_width_h, width_sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(traceback_height_h,
+                                        alignment_details_d_->traceback_height,
+                                        height_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(traceback_width_h,
+                                        alignment_details_d_->traceback_width,
+                                        width_sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        x.resize(max_dim);
+        y.resize(max_dim);
+
+        int path_length = 0;
+
+        for (int i = 0; i < max_dim; i++)
+        {
+            x[i] = traceback_width_h[i];
+            y[i] = traceback_height_h[i];
+            if (x[i] == 0 && y[i] == 0)
+            {
+                path_length = i + 1;
+                break;
+            }
+        }
+
+        x.erase(x.begin() + path_length, x.end());
+        y.erase(y.begin() + path_length, y.end());
+
+        //        for (int i = 0; i < path_length; i++)
+        //            std::cout << x[i] << ", " << y[i] << std::endl;
+
+        return StatusType::success;
+    }
+
     // Return batch ID.
     int32_t batch_id() const
     {
@@ -461,6 +682,10 @@ protected:
             break;
         case genomeworks::cudapoa::StatusType::loop_count_exceeded_upper_bound:
             GW_LOG_WARN("Kernel Error:: Loop count exceeded upper bound in nw algorithm in batch {}\n", bid_);
+            output_status.emplace_back(error_type);
+            break;
+        case genomeworks::cudapoa::StatusType::exceeded_adaptive_banded_matrix_size:
+            GW_LOG_WARN("Kernel Error:: Band width set for adaptive matrix allocation is too small in batch {}\n", bid_);
             output_status.emplace_back(error_type);
             break;
         case genomeworks::cudapoa::StatusType::exceeded_maximum_sequence_size:

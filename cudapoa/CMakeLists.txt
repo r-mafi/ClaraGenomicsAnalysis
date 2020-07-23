@@ -110,6 +110,11 @@ add_subdirectory(tests)
 add_subdirectory(benchmarks)
 add_subdirectory(samples)
 
+# for matplot
+find_package(Python2 COMPONENTS Development NumPy)
+target_include_directories(cudapoa PRIVATE ${Python2_INCLUDE_DIRS} ${Python2_NumPy_INCLUDE_DIRS})
+target_link_libraries(cudapoa Python2::Python Python2::NumPy)
+
 
 # Add auto formatting.
 gw_enable_auto_formatting("${CMAKE_CURRENT_SOURCE_DIR}")

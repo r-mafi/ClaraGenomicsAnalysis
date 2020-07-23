@@ -42,6 +42,7 @@ public:
     bool msa                  = false; // consensus by default
     bool banded               = true;
     bool adaptive             = false;
+    bool print_output         = false;
     int32_t band_width        = 256; // Band width for banded mode
     int32_t max_groups        = -1;  // -1 => infinite
     int32_t mismatch_score    = -6;
@@ -51,6 +52,8 @@ public:
     // for benchmark mode
     bool compact           = false;
     bool output_fasta      = false;
+    bool plot_traceback    = false;
+    int32_t plot_options   = -1;
     int32_t benchmark_mode = -1;
     int32_t single_window  = -1;
     int32_t max_reads      = -1;
