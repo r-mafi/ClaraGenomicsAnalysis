@@ -54,10 +54,11 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"compact-mode", no_argument, 0, 'C'},
         {"output-fasta", no_argument, 0, 'O'},
         {"plot-traceback", no_argument, 0, 'P'},
+        {"plot-options", required_argument, 0, 'Q'},
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhB:COPD:N:";
+    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhB:COPQ:D:N:";
 
     int32_t argument       = 0;
     bool default_bandwidth = true;
@@ -113,6 +114,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'P':
             plot_traceback = true;
+            break;
+        case 'Q':
+            plot_options = std::stoi(optarg);
             break;
         case 'D':
             single_window = std::stoi(optarg);
@@ -277,6 +281,9 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -P, --plot-traceback
             plots the traceback path for a single group, this option should be used with option -D [disabled])"
+              << R"(
+        -Q, --plot-options  <int>
+            additional options for plot, [0] plots diagonal, [1] axis equal, [2] both 0 and 1, default [-1])"
               << R"(
         -D, --single-window  <int>
             selects a single POA group instead of all input groups (must be positive and within the range of number of groups) [process all])"

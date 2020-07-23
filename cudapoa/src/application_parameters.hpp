@@ -53,6 +53,7 @@ public:
     bool compact           = false;
     bool output_fasta      = false;
     bool plot_traceback    = false;
+    int32_t plot_options   = -1;
     int32_t benchmark_mode = -1;
     int32_t single_window  = -1;
     int32_t max_reads      = -1;

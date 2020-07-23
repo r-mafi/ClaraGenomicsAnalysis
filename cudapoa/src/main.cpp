@@ -520,7 +520,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             }
             min_seq_length[i] = min_sz;
             max_seq_length[i] = max_sz;
-            avg_seq_length[i] = avg_sz = avg_sz/get_size<int>(group);
+            avg_seq_length[i] = avg_sz = avg_sz / get_size<int>(group);
 
             std::cerr << "G " << std::left << std::setw(3) << i << " (" << std::left << std::setw(6) << min_sz << ", ";
             std::cerr << std::left << std::setw(6) << max_sz << ", " << std::left << std::setw(6) << avg_sz << std::left << std::setw(5) << ")";
@@ -774,6 +774,26 @@ int main(int argc, char* argv[])
             // plot start and end of adaptive bands
             plt::plot(abs, lin, "c:");
             plt::plot(abe, lin, "c:");
+            // additional plot options
+            if (parameters.plot_options != -1)
+            {
+                if (parameters.plot_options == 0 || parameters.plot_options == 2)
+                {
+                    int32_t height = *(std::max_element(y_a.begin(), y_a.end()));
+                    int32_t width  = *(std::max_element(x_a.begin(), x_a.end()));
+                    std::vector<int32_t> diagonal(width);
+                    for (int i = 0; i < width; i++)
+                    {
+                        diagonal[i] = height * i / width;
+                    }
+                    plt::plot(diagonal, "y:");
+                }
+                if (parameters.plot_options == 1 || parameters.plot_options == 2)
+                {
+                    plt::axis("equal");
+                }
+            }
+
             plt::show();
         }
         else
