@@ -218,6 +218,11 @@ public:
     virtual StatusType get_adaptive_band_boundaries(std::vector<int32_t>& band_start,
                                                     std::vector<int32_t>& band_end) = 0;
 
+    /// \brief Used in benchmark mode, used to plot maximum scores trace in adaptive banding
+    ///
+    /// \param max_indices   max score index per node
+    virtual StatusType get_adaptive_max_score_indices(std::vector<int32_t>& max_score_indices) = 0;
+
     /// \brief Used in benchmark mode, used to plot traceback path and is available only for a single POA group
     ///
     /// \param x   x-coordinates of the tracepack path

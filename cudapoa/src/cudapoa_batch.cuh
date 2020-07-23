@@ -514,6 +514,46 @@ public:
         return StatusType::success;
     }
 
+    StatusType get_adaptive_max_score_indices(std::vector<int32_t>& max_score_indices)
+    {
+        // This kernel is used to plot adaptive band ends and is available only for a single POA group
+        if (!adaptive_banding_ || poa_count_ > 1)
+        {
+            return StatusType::output_type_unavailable;
+        }
+
+        SizeT* max_score_index_h;
+        size_t sz = batch_size_.max_nodes_per_window_banded * sizeof(*max_score_index_h);
+        GW_CU_CHECK_ERR(cudaHostAlloc((void**)&max_score_index_h, sz, cudaHostAllocDefault));
+
+        std::string msg = " Launching memcpy D2H on device ";
+        print_batch_debug_message(msg);
+        GW_CU_CHECK_ERR(cudaMemcpyAsync(max_score_index_h,
+                                        alignment_details_d_->band_max_indices,
+                                        sz,
+                                        cudaMemcpyDeviceToHost,
+                                        stream_));
+        GW_CU_CHECK_ERR(cudaStreamSynchronize(stream_));
+
+        msg = " Finished memcpy D2H on device ";
+        print_batch_debug_message(msg);
+
+        max_score_indices.reserve(batch_size_.max_nodes_per_window_banded);
+        int32_t id = -1;
+
+        for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+        {
+            id = max_score_index_h[i];
+            if (id < 0)
+            {
+                break;
+            }
+            max_score_indices.push_back(id);
+        }
+
+        return StatusType::success;
+    }
+
     // Get the consensus for each POA.
     StatusType get_traceback_path(std::vector<int32_t>& x,
                                   std::vector<int32_t>& y)

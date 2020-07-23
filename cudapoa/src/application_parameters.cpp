@@ -283,7 +283,7 @@ void ApplicationParameters::help(int32_t exit_code)
             plots the traceback path for a single group, this option should be used with option -D [disabled])"
               << R"(
         -Q, --plot-options  <int>
-            additional options for plot, [0] plots diagonal, [1] axis equal, [2] both 0 and 1, default [-1])"
+            additional options for plot, [0] plots diagonal, [1] plots max index, [2] axis equal, [3] all the options, default [-1])"
               << R"(
         -D, --single-window  <int>
             selects a single POA group instead of all input groups (must be positive and within the range of number of groups) [process all])"

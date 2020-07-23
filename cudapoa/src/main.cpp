@@ -87,7 +87,8 @@ void process_batch(Batch* batch,
                    std::vector<int32_t>* traceback_x         = nullptr,
                    std::vector<int32_t>* traceback_y         = nullptr,
                    std::vector<int32_t>* band_s              = nullptr,
-                   std::vector<int32_t>* band_e              = nullptr)
+                   std::vector<int32_t>* band_e              = nullptr,
+                   std::vector<int32_t>* max_score_indices   = nullptr)
 {
     batch->generate_poa(parameters.plot_traceback);
 
@@ -174,6 +175,11 @@ void process_batch(Batch* batch,
             if ((parameters.benchmark_mode != 2) && band_s != nullptr && band_e != nullptr)
             {
                 batch->get_adaptive_band_boundaries(*band_s, *band_e);
+                // for plotting max score index trace
+                if ((parameters.plot_options == 1 || parameters.plot_options == 3) && max_score_indices != nullptr)
+                {
+                    batch->get_adaptive_max_score_indices(*max_score_indices);
+                }
             }
         }
     }
@@ -242,7 +248,8 @@ void run_cudapoa(const ApplicationParameters& parameters,
                  std::vector<int32_t>* x_plot         = nullptr,
                  std::vector<int32_t>* y_plot         = nullptr,
                  std::vector<int32_t>* abs_plot       = nullptr,
-                 std::vector<int32_t>* abe_plot       = nullptr)
+                 std::vector<int32_t>* abe_plot       = nullptr,
+                 std::vector<int32_t>* max_idx_plot   = nullptr)
 {
     bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
     bool band_stats = (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
@@ -329,7 +336,7 @@ void run_cudapoa(const ApplicationParameters& parameters,
                     // No more POA groups can be added to batch. Now process batch
                     timer.start_timer();
                     process_batch(batch.get(), parameters, batch_group_ids, group_count, &batch_consensus,
-                                  &batch_min_bw, &batch_max_bw, &batch_avg_bw, x_plot, y_plot, abs_plot, abe_plot);
+                                  &batch_min_bw, &batch_max_bw, &batch_avg_bw, x_plot, y_plot, abs_plot, abe_plot, max_idx_plot);
                     compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
@@ -764,20 +771,21 @@ int main(int argc, char* argv[])
         {
             std::vector<int32_t> x_a, x_b, y_a, y_b; // x and y coordinates of traceback path for alignment A and B
             std::vector<int32_t> abs, abe;           // adaptive_band_start and adaptive_band_end
-            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a, &abs, &abe);
+            std::vector<int32_t> max_scroe_idx;      // index of maximum score per node in adaptive score matrix
+            run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a, &min_band_width_a, &max_band_width_a, &avg_band_width_a, &x_a, &y_a, &abs, &abe, &max_scroe_idx);
             run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b, nullptr, nullptr, nullptr, &x_b, &y_b);
             plt::plot(x_a, y_a);
             plt::plot(x_b, y_b, "r--");
             // create linearly spaced vector
             std::vector<int32_t> lin(abs.size()); // abs.size() == abe.size()
             std::iota(lin.begin(), lin.end(), 0);
-            // plot start and end of adaptive bands
+            // plot start and end of adaptive bands ---------------
             plt::plot(abs, lin, "c:");
             plt::plot(abe, lin, "c:");
-            // additional plot options
+            // additional plot options ---------------------------
             if (parameters.plot_options != -1)
             {
-                if (parameters.plot_options == 0 || parameters.plot_options == 2)
+                if (parameters.plot_options == 0 || parameters.plot_options == 3)
                 {
                     int32_t height = *(std::max_element(y_a.begin(), y_a.end()));
                     int32_t width  = *(std::max_element(x_a.begin(), x_a.end()));
@@ -788,7 +796,13 @@ int main(int argc, char* argv[])
                     }
                     plt::plot(diagonal, "y:");
                 }
-                if (parameters.plot_options == 1 || parameters.plot_options == 2)
+                if (parameters.plot_options == 1 || parameters.plot_options == 3)
+                {
+                    lin.resize(max_scroe_idx.size());
+                    std::iota(lin.begin(), lin.end(), 0);
+                    plt::plot(max_scroe_idx, lin, "y--");
+                }
+                if (parameters.plot_options == 2 || parameters.plot_options == 3)
                 {
                     plt::axis("equal");
                 }
