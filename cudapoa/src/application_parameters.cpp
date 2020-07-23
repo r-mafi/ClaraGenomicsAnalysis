@@ -256,6 +256,9 @@ void ApplicationParameters::help(int32_t exit_code)
         -N, --max-reads  <int>
             max number of sequences per POA group (must be positive and less than number of reads)[process all])"
               << R"(
+        -L, --bonito-long
+            set processing mode to bonito-long-read mode. output in fasta format)"
+              << R"(
         -v, --version
             version information)"
               << R"(

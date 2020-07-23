@@ -72,7 +72,7 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
     return std::move(batch);
 }
 
-void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>& list_of_group_ids, int id_offset, std::vector<std::string>* batch_consensus = nullptr)
+void process_batch(Batch* batch, bool msa_flag, bool print, bool print_fasta, std::vector<int32_t>& list_of_group_ids, int id_offset, std::vector<std::string>* batch_consensus = nullptr)
 {
     batch->generate_poa();
 
@@ -101,6 +101,10 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
                 {
                     for (const auto& alignment : msa[g])
                     {
+                        if(print_fasta)
+                        {
+                            std::cout << ">" << list_of_group_ids[g + id_offset] <<std::endl;
+                        }
                         std::cout << alignment << std::endl;
                     }
                 }
@@ -130,6 +134,10 @@ void process_batch(Batch* batch, bool msa_flag, bool print, std::vector<int32_t>
             {
                 if (print)
                 {
+                    if(print_fasta)
+                    {
+                        std::cout << ">" << list_of_group_ids[g + id_offset] <<std::endl;
+                    }
                     std::cout << consensus[g] << std::endl;
                 }
             }
@@ -272,7 +280,7 @@ void run_cudapoa(const ApplicationParameters& parameters, const std::vector<Grou
                 {
                     // No more POA groups can be added to batch. Now process batch
                     timer.start_timer();
-                    process_batch(batch.get(), parameters.msa, print, batch_group_ids, group_count, &batch_consensus);
+                    process_batch(batch.get(), parameters.msa, print, parameters.bonito_long, batch_group_ids, group_count, &batch_consensus);
                     compute_time += timer.stop_timer();
 
                     if (graph_output.is_open())
