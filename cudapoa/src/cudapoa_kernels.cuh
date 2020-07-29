@@ -106,8 +106,6 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                   uint32_t max_nodes_per_window,
                                   uint32_t max_graph_dimension,
                                   uint32_t max_limit_consensus_size,
-                                  int64_t* band_head_indices_d,
-                                  SizeT* band_max_indices_d,
                                   bool plot_traceback,
                                   SizeT* traceback_width_d,
                                   SizeT* traceback_height_d,
@@ -160,8 +158,6 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
 
     SizeT* alignment_graph         = &alignment_graph_d[max_graph_dimension * window_idx];
     SizeT* alignment_read          = &alignment_read_d[max_graph_dimension * window_idx];
-    int64_t* head_indices          = &band_head_indices_d[max_nodes_per_window * window_idx];
-    SizeT* max_indices             = &band_max_indices_d[max_nodes_per_window * window_idx];
     uint16_t* node_coverage_counts = &node_coverage_counts_d_[max_nodes_per_window * window_idx];
     SizeT* traceback_width         = &traceback_width_d[2 * max_nodes_per_window * window_idx];
     SizeT* traceback_height        = &traceback_height_d[2 * max_nodes_per_window * window_idx];
@@ -281,8 +277,6 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                                                                             banded_score_matrix_size,
                                                                                             alignment_graph,
                                                                                             alignment_read,
-                                                                                            head_indices,
-                                                                                            max_indices,
                                                                                             traceback_width,
                                                                                             traceback_height,
                                                                                             collect_traceback,
@@ -310,8 +304,6 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                                                                                 banded_score_matrix_size,
                                                                                                 alignment_graph,
                                                                                                 alignment_read,
-                                                                                                head_indices,
-                                                                                                max_indices,
                                                                                                 traceback_width,
                                                                                                 traceback_height,
                                                                                                 collect_traceback,
@@ -495,8 +487,6 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
     ScoreT* scores          = alignment_details_d->scores;
     SizeT* alignment_graph  = alignment_details_d->alignment_graph;
     SizeT* alignment_read   = alignment_details_d->alignment_read;
-    int64_t* head_indices   = alignment_details_d->band_head_indices;
-    SizeT* max_indices      = alignment_details_d->band_max_indices;
     SizeT* traceback_width  = alignment_details_d->traceback_width;
     SizeT* traceback_height = alignment_details_d->traceback_height;
 
@@ -570,8 +560,6 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                       max_nodes_per_window,
                                       max_matrix_graph_dimension,
                                       batch_size.max_consensus_size,
-                                      head_indices,
-                                      max_indices,
                                       traceback_flag,
                                       traceback_width,
                                       traceback_height,
