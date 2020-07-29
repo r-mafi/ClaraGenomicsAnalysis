@@ -153,9 +153,9 @@ inline void parse_fasta_files(std::vector<std::vector<std::string>>& windows, co
     const int32_t min_sequence_length = 0;
     const int32_t num_input_files     = input_paths.size();
     windows.resize(num_input_files);
-    if(bonito_long_reads)
+    if (bonito_long_reads)
     {
-        const int32_t num_input_files        = 6;
+        const int32_t num_input_files = 6;
         std::vector<std::shared_ptr<io::FastaParser>> fasta_parser_vec(num_input_files);
         std::vector<int> num_reads_per_file(num_input_files);
         for (int32_t i = 0; i < num_input_files; i++)
@@ -164,10 +164,10 @@ inline void parse_fasta_files(std::vector<std::vector<std::string>>& windows, co
             num_reads_per_file[i] = fasta_parser_vec[i]->get_num_seqences();
         }
         const int32_t num_reads = num_reads_per_file[0];
-        
-        for(int32_t i = 1; i < num_input_files; i++)
+
+        for (int32_t i = 1; i < num_input_files; i++)
         {
-            if(num_reads_per_file[i] != num_reads)
+            if (num_reads_per_file[i] != num_reads)
             {
                 assert(false);
                 std::cerr << "Failed to complete long-read sample." << std::endl;
@@ -178,9 +178,9 @@ inline void parse_fasta_files(std::vector<std::vector<std::string>>& windows, co
 
         windows.resize(num_reads);
         int32_t idx = 0;
-        for (auto& window: windows)
+        for (auto& window : windows)
         {
-            for(int32_t i = 0; i < num_input_files; i++)
+            for (int32_t i = 0; i < num_input_files; i++)
             {
                 window.push_back(fasta_parser_vec[i]->get_sequence_by_id(idx).seq);
             }
@@ -199,8 +199,7 @@ inline void parse_fasta_files(std::vector<std::vector<std::string>>& windows, co
             }
         }
     }
-    
-    
+
     resize_windows(windows, total_windows);
 }
 

@@ -116,7 +116,7 @@ __device__ ScoreT get_score_adaptive(ScoreT* scores, SizeT row, SizeT column,
 {
     SizeT band_start = get_band_start_for_row_adaptive(row, gradient, band_width, band_shift, max_column);
     SizeT band_end   = band_start + band_width;
-    band_end = min(band_end, max_column);
+    band_end         = min(band_end, max_column);
 
     if ((column > band_end || column < band_start) && column != -1)
     {
@@ -152,8 +152,8 @@ __device__ ScoreT4<ScoreT> get_scores_adaptive(ScoreT* scores,
 
     // subtract by CELLS_PER_THREAD to ensure score4_next is not pointing out of the corresponding band bounds
     SizeT band_start = get_band_start_for_row_adaptive(row, gradient, band_width, band_shift, max_column);
-    SizeT band_end = static_cast<SizeT>(band_start + band_width - CELLS_PER_THREAD);
-    band_end = min(band_end, max_column);
+    SizeT band_end   = static_cast<SizeT>(band_start + band_width - CELLS_PER_THREAD);
+    band_end         = min(band_end, max_column);
 
     if ((column > band_end || column < band_start) && column != -1)
     {
@@ -500,7 +500,7 @@ __device__
     if (lane_idx == 0)
     {
         // mark end of band-width array
-        band_widths[graph_count + 1] = -1;
+        //band_widths[graph_count + 1] = -1;
 
         // Find location of the maximum score in the matrix.
         SizeT i       = 0;

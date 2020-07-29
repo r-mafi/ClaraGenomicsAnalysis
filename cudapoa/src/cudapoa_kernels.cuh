@@ -160,11 +160,11 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
 
     SizeT* alignment_graph         = &alignment_graph_d[max_graph_dimension * window_idx];
     SizeT* alignment_read          = &alignment_read_d[max_graph_dimension * window_idx];
-    SizeT* band_starts             = &band_starts_d[max_nodes_per_window * window_idx];
-    SizeT* band_widths             = &band_widths_d[max_nodes_per_window * window_idx];
     int64_t* head_indices          = &band_head_indices_d[max_nodes_per_window * window_idx];
     SizeT* max_indices             = &band_max_indices_d[max_nodes_per_window * window_idx];
     uint16_t* node_coverage_counts = &node_coverage_counts_d_[max_nodes_per_window * window_idx];
+    SizeT* traceback_width         = &traceback_width_d[2 * max_nodes_per_window * window_idx];
+    SizeT* traceback_height        = &traceback_height_d[2 * max_nodes_per_window * window_idx];
 
 #ifdef SPOA_ACCURATE
     uint8_t* node_marks       = &node_marks_d_[max_nodes_per_window * window_idx];
