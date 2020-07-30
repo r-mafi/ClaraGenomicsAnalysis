@@ -59,7 +59,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:cpd:M:R:m:n:g:vhLB:COPQ:D:N:";
+    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhLB:COPQ:D:N:";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -80,8 +80,8 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'p':
             print_output = true;
-        case 'c':
-            corrective = true;
+        case 'A':
+            adaptive = true;
             break;
         case 'd':
             graph_output_path = std::string(optarg);
@@ -144,9 +144,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         throw std::runtime_error("band-width must be positive");
     }
 
-    if (!banded && corrective)
+    if (!banded && adaptive)
     {
-        throw std::runtime_error("corrective banded alignment cannot run with full alignment");
+        throw std::runtime_error("adaptive banded alignment cannot run with full alignment");
     }
 
     if (match_score < 0)
@@ -240,8 +240,8 @@ void ApplicationParameters::help(int32_t exit_code)
         -b, --band-width <int>
             band-width for banded alignment (must be multiple of 128) [256])"
               << R"(
-        -c, --corrective-alignment
-            uses corrective banded alignment if this flag is passed [banded alignment])"
+        -A, --adaptive-alignment
+            uses adaptive banded alignment if this flag is passed [banded alignment])"
               << R"(
         -p, --print-output
             prints consensus/MSA output [disabled])"
