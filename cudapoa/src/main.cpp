@@ -67,8 +67,6 @@ std::unique_ptr<Batch> initialize_batch(int32_t mismatch_score,
                                                 gap_score,
                                                 mismatch_score,
                                                 match_score,
-                                                batch_size.band_mode == BandMode::static_band,
-                                                batch_size.band_mode == BandMode::adaptive_band,
                                                 plot_traceback);
 
     return std::move(batch);
