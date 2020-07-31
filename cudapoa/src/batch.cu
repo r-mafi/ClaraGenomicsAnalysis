@@ -44,7 +44,7 @@ std::unique_ptr<Batch> create_batch(int32_t device_id,
 {
     if (use32bitScore(batch_size, gap_score, mismatch_score, match_score))
     {
-        if (use32bitSize(batch_size, banded_alignment))
+        if (use32bitSize(batch_size))
         {
             return std::make_unique<CudapoaBatch<int32_t, int32_t>>(device_id,
                                                                     stream,
