@@ -38,8 +38,8 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
     struct option options[] = {
         {"input", required_argument, 0, 'i'},
         {"msa", no_argument, 0, 'a'},
-        {"full-alignment", no_argument, 0, 'f'},
-        {"band-width", required_argument, 0, 'b'},
+        {"band-mode", required_argument, 0, 'b'},
+        {"band-width", required_argument, 0, 'w'},
         {"dot", required_argument, 0, 'd'},
         {"max-groups", required_argument, 0, 'M'},
         {"gpu-mem-alloc", required_argument, 0, 'R'},
@@ -59,7 +59,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:afb:Apd:M:R:m:n:g:vhLB:COPQ:D:N:";
+    std::string optstring = "i:ab:wpd:M:R:m:n:g:vhLB:COPQ:D:N:";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -72,16 +72,13 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         case 'a':
             msa = true;
             break;
-        case 'f':
-            banded = false;
-            break;
         case 'b':
-            band_width = std::stoi(optarg);
+            band_mode = std::stoi(optarg);
             break;
         case 'p':
             print_output = true;
-        case 'A':
-            adaptive = true;
+        case 'w':
+            band_width = std::stoi(optarg);
             break;
         case 'd':
             graph_output_path = std::string(optarg);
@@ -136,17 +133,17 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
 
     if (gpu_mem_allocation <= 0 || gpu_mem_allocation > 1.0)
     {
-        throw std::runtime_error("gpu-mem-alloc should be greater than 0 and less than or equal to 1.0");
+        throw std::runtime_error("gpu-mem-alloc must be greater than 0 and less than or equal to 1.0");
     }
 
-    if (banded && band_width < 1)
+    if (band_mode < 0 || band_mode > 2)
+    {
+        throw std::runtime_error("band-mode must be either 0 for full bands, 1 for static bands or 2 for adaptive bands");
+    }
+
+    if (band_mode != 2 && band_width < 1)
     {
         throw std::runtime_error("band-width must be positive");
-    }
-
-    if (!banded && adaptive)
-    {
-        throw std::runtime_error("adaptive banded alignment cannot run with full alignment");
     }
 
     if (match_score < 0)
@@ -234,14 +231,11 @@ void ApplicationParameters::help(int32_t exit_code)
         -a, --msa
             generates msa if this flag is passed [default: consensus])"
               << R"(
-        -f, --full-alignment
-            uses full alignment if this flag is passed [banded alignment])"
+        -b, --band-mode  <int>
+            selects banding mode, 0: full-alignment, 1: static band, 2: adaptive band [1])"
               << R"(
-        -b, --band-width <int>
+        -w, --band-width <int>
             band-width for banded alignment (must be multiple of 128) [256])"
-              << R"(
-        -A, --adaptive-alignment
-            uses adaptive banded alignment if this flag is passed [banded alignment])"
               << R"(
         -p, --print-output
             prints consensus/MSA output [disabled])"
