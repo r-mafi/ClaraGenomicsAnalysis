@@ -719,7 +719,7 @@ int main(int argc, char* argv[])
     {
         if (parameters.plot_traceback)
         {
-            if (parameters.adaptive)
+            if (parameters.band_mode == BandMode::adaptive_band)
             {
                 std::vector<int32_t> x, y;
                 std::vector<int32_t> abs, abe;
@@ -750,22 +750,18 @@ int main(int argc, char* argv[])
         ApplicationParameters parameters_b = parameters;
         if (parameters.benchmark_mode == 0)
         {
-            parameters_a.adaptive = true;  // adaptive-alignment
-            parameters_b.adaptive = false; // banded-alignment
-            parameters_b.banded   = true;
+            parameters_a.band_mode = BandMode::adaptive_band;  // adaptive-alignment
+            parameters_b.band_mode = BandMode::static_band;
         }
         if (parameters.benchmark_mode == 1)
         {
-            parameters_a.adaptive = true;  // adaptive-alignment
-            parameters_b.adaptive = false; // full-alignment
-            parameters_b.banded   = false;
+            parameters_a.band_mode = BandMode::adaptive_band;  // adaptive-alignment
+            parameters_b.band_mode = BandMode::full_band; // full-alignment
         }
         if (parameters.benchmark_mode == 2)
         {
-            parameters_a.adaptive = false; // banded-alignment
-            parameters_a.banded   = true;
-            parameters_b.adaptive = false; // full-alignment
-            parameters_b.banded   = false;
+            parameters_a.band_mode = BandMode::static_band; // banded-alignment
+            parameters_b.band_mode = BandMode::full_band; // full-alignment
         }
 
         if (parameters.plot_traceback)
