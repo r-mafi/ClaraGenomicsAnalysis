@@ -725,7 +725,7 @@ int main(int argc, char* argv[])
     {
         if (parameters.plot_traceback)
         {
-            if (parameters.corrective)
+            if (parameters.adaptive)
             {
                 std::vector<int32_t> x, y;
                 std::vector<int32_t> abs, abe;
@@ -756,21 +756,21 @@ int main(int argc, char* argv[])
         ApplicationParameters parameters_b = parameters;
         if (parameters.benchmark_mode == 0)
         {
-            parameters_a.corrective = true;  // adaptive-alignment
-            parameters_b.corrective = false; // banded-alignment
+            parameters_a.adaptive = true;  // adaptive-alignment
+            parameters_b.adaptive = false; // banded-alignment
             parameters_b.banded   = true;
         }
         if (parameters.benchmark_mode == 1)
         {
-            parameters_a.corrective = true;  // adaptive-alignment
-            parameters_b.corrective = false; // full-alignment
+            parameters_a.adaptive = true;  // adaptive-alignment
+            parameters_b.adaptive = false; // full-alignment
             parameters_b.banded   = false;
         }
         if (parameters.benchmark_mode == 2)
         {
-            parameters_a.corrective = false; // banded-alignment
+            parameters_a.adaptive = false; // banded-alignment
             parameters_a.banded   = true;
-            parameters_b.corrective = false; // full-alignment
+            parameters_b.adaptive = false; // full-alignment
             parameters_b.banded   = false;
         }
 

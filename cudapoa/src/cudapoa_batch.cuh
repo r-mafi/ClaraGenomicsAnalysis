@@ -401,7 +401,7 @@ public:
                                             std::vector<int32_t>& avg_band_width)
     {
         // Check if adaptive banding was requested at init time.
-        if (!corrective_banded_)
+        if (!adaptive_banded_)
         {
             return StatusType::output_type_unavailable;
         }
@@ -466,7 +466,7 @@ public:
                                             std::vector<int32_t>& band_end)
     {
         // This kernel is used to plot adaptive band ends and is available only for a single POA group
-        if (!corrective_banded_ || poa_count_ > 1)
+        if (!adaptive_banded_ || poa_count_ > 1)
         {
             return StatusType::output_type_unavailable;
         }
@@ -516,7 +516,7 @@ public:
     StatusType get_adaptive_max_score_indices(std::vector<int32_t>& max_score_indices)
     {
         // This kernel is used to plot adaptive band ends and is available only for a single POA group
-        if (!corrective_banded_ || poa_count_ > 1)
+        if (!adaptive_banded_ || poa_count_ > 1)
         {
             return StatusType::output_type_unavailable;
         }
