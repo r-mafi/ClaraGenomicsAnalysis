@@ -408,7 +408,7 @@ public:
 
         SizeT* band_widths_h;
         // Allocate.
-        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_window_banded * sizeof(*band_widths_h);
+        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_graph * sizeof(*band_widths_h);
         GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_widths_h, bw_sz, cudaHostAllocDefault));
 
         std::string msg = " Launching memcpy D2H on device ";
@@ -430,7 +430,7 @@ public:
         for (int32_t poa = 0; poa < poa_count_; poa++)
         {
             int32_t bw     = 0;
-            int32_t offset = poa * batch_size_.max_nodes_per_window_banded;
+            int32_t offset = poa * batch_size_.max_nodes_per_graph;
 
             int32_t min_width = batch_size_.max_matrix_sequence_dimension;
             int32_t max_width = 0;
@@ -438,7 +438,7 @@ public:
             int32_t num_rows  = 0;
 
             // ignore the first row, since it's just based on static band-width
-            for (int32_t i = 1; i < batch_size_.max_nodes_per_window_banded; i++)
+            for (int32_t i = 1; i < batch_size_.max_nodes_per_graph; i++)
             {
                 bw = band_widths_h[offset + i];
                 if (bw < 0)
@@ -473,7 +473,7 @@ public:
 
         SizeT* band_starts_h;
         SizeT* band_widths_h;
-        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_window_banded * sizeof(*band_widths_h);
+        size_t bw_sz = max_poas_ * batch_size_.max_nodes_per_graph * sizeof(*band_widths_h);
         GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_starts_h, bw_sz, cudaHostAllocDefault));
         GW_CU_CHECK_ERR(cudaHostAlloc((void**)&band_widths_h, bw_sz, cudaHostAllocDefault));
 
@@ -494,12 +494,12 @@ public:
         msg = " Finished memcpy D2H on device ";
         print_batch_debug_message(msg);
 
-        band_start.reserve(batch_size_.max_nodes_per_window_banded);
-        band_end.reserve(batch_size_.max_nodes_per_window_banded);
+        band_start.reserve(batch_size_.max_nodes_per_graph);
+        band_end.reserve(batch_size_.max_nodes_per_graph);
 
         int bw = 0;
 
-        for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+        for (int32_t i = 0; i < batch_size_.max_nodes_per_graph; i++)
         {
             bw = band_widths_h[i];
             if (bw < 0)
@@ -522,7 +522,7 @@ public:
         }
 
         SizeT* max_score_index_h;
-        size_t sz = batch_size_.max_nodes_per_window_banded * sizeof(*max_score_index_h);
+        size_t sz = batch_size_.max_nodes_per_graph * sizeof(*max_score_index_h);
         GW_CU_CHECK_ERR(cudaHostAlloc((void**)&max_score_index_h, sz, cudaHostAllocDefault));
 
         std::string msg = " Launching memcpy D2H on device ";
@@ -537,10 +537,10 @@ public:
         msg = " Finished memcpy D2H on device ";
         print_batch_debug_message(msg);
 
-        max_score_indices.reserve(batch_size_.max_nodes_per_window_banded);
+        max_score_indices.reserve(batch_size_.max_nodes_per_graph);
         int32_t id = -1;
 
-        for (int32_t i = 0; i < batch_size_.max_nodes_per_window_banded; i++)
+        for (int32_t i = 0; i < batch_size_.max_nodes_per_graph; i++)
         {
             id = max_score_index_h[i];
             if (id < 0)
@@ -564,7 +564,7 @@ public:
         SizeT* traceback_height_h;
         SizeT* traceback_width_h;
         // Allocate host memory
-        int32_t max_dim  = 2 * batch_size_.max_nodes_per_window_banded;
+        int32_t max_dim  = 2 * batch_size_.max_nodes_per_graph;
         size_t height_sz = max_dim * sizeof(*traceback_height_h);
         size_t width_sz  = max_dim * sizeof(*traceback_width_h);
 
