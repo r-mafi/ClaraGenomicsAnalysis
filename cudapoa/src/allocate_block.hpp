@@ -320,7 +320,7 @@ public:
 
     int32_t get_max_poas() const { return max_poas_; };
 
-    static int64_t compute_device_memory_per_poa(const BatchSize& batch_size, const bool banded_alignment, const bool msa_flag, const bool variable_bands = false, const bool plot_traceback = false))
+    static int64_t compute_device_memory_per_poa(const BatchSize& batch_size, const bool banded_alignment, const bool msa_flag, const bool variable_bands = false, const bool plot_traceback = false)
     {
         int64_t device_size_per_poa = 0;
 
@@ -447,7 +447,7 @@ protected:
     std::tuple<int64_t, int64_t, int64_t, int64_t> calculate_space_per_poa(const BatchSize& batch_size, bool plot_traceback)
     {
         int64_t host_size_per_poa   = compute_host_memory_per_poa(batch_size, banded_alignment_, (output_mask_ & OutputType::msa));
-        int64_t device_size_per_poa = compute_device_memory_per_poa(batch_size, banded_alignment_, (output_mask_ & OutputType::msa), variable_bands_, plot_tracenack);
+        int64_t device_size_per_poa = compute_device_memory_per_poa(batch_size, banded_alignment_, (output_mask_ & OutputType::msa), variable_bands_, plot_traceback);
         int64_t device_size_fixed   = 0;
         int64_t host_size_fixed     = 0;
         // for output - host
@@ -474,12 +474,12 @@ protected:
     // Use banded POA alignment
     bool banded_alignment_;
 
+    // Flag for plotting traceback path
+    bool plot_traceback_;
+
     // flag that enables some extra buffers to accommodate fully adaptive bands with variable width and arbitrary location
     // disabled for current implementation, can be enabled for possible future variants of adaptive alignment algorithm
     bool variable_bands_ = false;
-
-    // Flag for plotting traceback path
-    bool plot_traceback_;
 
     // Pointer for block data on host and device
     uint8_t* block_data_h_;
