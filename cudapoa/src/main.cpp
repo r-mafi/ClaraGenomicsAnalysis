@@ -176,15 +176,15 @@ void process_batch(Batch* batch,
             batch->get_traceback_path(*traceback_x, *traceback_y);
 
             // for adaptive alignment, in addition to traceback path, extract boundaries of adaptive band
-            if ((parameters.benchmark_mode != 2) && band_s != nullptr && band_e != nullptr)
-            {
-                batch->get_adaptive_band_boundaries(*band_s, *band_e);
-                // for plotting max score index trace
-                if ((parameters.plot_options == 1 || parameters.plot_options == 3) && max_score_indices != nullptr)
-                {
-                    batch->get_adaptive_max_score_indices(*max_score_indices);
-                }
-            }
+//            if ((parameters.benchmark_mode != 2) && band_s != nullptr && band_e != nullptr)
+//            {
+//                batch->get_adaptive_band_boundaries(*band_s, *band_e);
+//                // for plotting max score index trace
+//                if ((parameters.plot_options == 1 || parameters.plot_options == 3) && max_score_indices != nullptr)
+//                {
+//                    batch->get_adaptive_max_score_indices(*max_score_indices);
+//                }
+//            }
         }
     }
 }

@@ -217,6 +217,12 @@ public:
             offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->traceback_width) * 2 * max_graph_dimension_ * max_poas_);
             alignment_details_d->traceback_height = reinterpret_cast<decltype(alignment_details_d->traceback_height)>(&block_data_d_[offset_d_]);
             offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->traceback_height) * 2 * max_graph_dimension_ * max_poas_);
+//            alignment_details_d->band_max_indices = reinterpret_cast<decltype(alignment_details_d->band_max_indices)>(&block_data_d_[offset_d_]);
+//            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_max_indices) * max_graph_dimension_ * max_poas_);
+//            alignment_details_d->band_starts = reinterpret_cast<decltype(alignment_details_d->band_starts)>(&block_data_d_[offset_d_]);
+//            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_starts) * max_graph_dimension_ * max_poas_);
+//            alignment_details_d->band_widths = reinterpret_cast<decltype(alignment_details_d->band_widths)>(&block_data_d_[offset_d_]);
+//            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_widths) * max_graph_dimension_ * max_poas_);
         }
 
         // rest of the available memory is assigned to scores buffer
