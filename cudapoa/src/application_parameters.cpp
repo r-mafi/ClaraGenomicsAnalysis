@@ -78,9 +78,6 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         case 'b':
             band_width = std::stoi(optarg);
             break;
-        case 'c':
-            corrective = true;
-            break;
         case 'p':
             print_output = true;
         case 'c':

@@ -144,7 +144,7 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
 
     int64_t scores_offset;
     int64_t banded_score_matrix_size;
-    if (cuda_banded_alignment)
+    if (banded_alignment)
     {
         banded_score_matrix_size = static_cast<int64_t>(max_graph_dimension) * static_cast<int64_t>(banded_alignment_band_width + CUDAPOA_BANDED_MATRIX_RIGHT_PADDING);
         scores_offset            = banded_score_matrix_size * static_cast<int64_t>(window_idx);
@@ -596,7 +596,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                                                   nodes_to_visit,
                                                                   max_nodes_per_window,
                                                                   batch_size.max_consensus_size,
-                                                                  cuda_banded_alignment);
+                                                                  banded_alignment);
         GW_CU_CHECK_ERR(cudaPeekAtLastError());
     }
     else
@@ -622,7 +622,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                                                                    node_coverage_counts,
                                                                                    max_nodes_per_window,
                                                                                    batch_size.max_consensus_size,
-                                                                                   cuda_banded_alignment);
+                                                                                   banded_alignment);
         GW_CU_CHECK_ERR(cudaPeekAtLastError());
     }
 }
