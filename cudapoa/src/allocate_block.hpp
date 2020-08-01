@@ -356,12 +356,12 @@ public:
         device_size_per_poa += (msa_flag) ? sizeof(*GraphDetails<SizeT>::outgoing_edges_coverage_count) * max_nodes_per_graph * CUDAPOA_MAX_NODE_EDGES : 0;                              // graph_details_d_->outgoing_edges_coverage_count
         device_size_per_poa += (msa_flag) ? sizeof(*GraphDetails<SizeT>::node_id_to_msa_pos) * max_nodes_per_graph : 0;                                                                  // graph_details_d_->node_id_to_msa_pos
         // for alignment - device
-        device_size_per_poa += sizeof(*AlignmentDetails<ScoreT, SizeT>::alignment_graph) * max_nodes_per_graph;                        // alignment_details_d_->alignment_graph
-        device_size_per_poa += sizeof(*AlignmentDetails<ScoreT, SizeT>::alignment_read) * max_nodes_per_graph;                         // alignment_details_d_->alignment_read
-        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_starts) * max_nodes_per_graph : 0;       // alignment_details_d_->band_starts
-        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_widths) * max_nodes_per_graph : 0;       // alignment_details_d_->band_widths
-        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_head_indices) * max_nodes_per_graph : 0; // alignment_details_d_->band_head_indices
-        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_max_indices) * max_nodes_per_graph : 0;  // alignment_details_d_->band_max_indices
+        device_size_per_poa += sizeof(*AlignmentDetails<ScoreT, SizeT>::alignment_graph) * max_nodes_per_graph;                           // alignment_details_d_->alignment_graph
+        device_size_per_poa += sizeof(*AlignmentDetails<ScoreT, SizeT>::alignment_read) * max_nodes_per_graph;                            // alignment_details_d_->alignment_read
+        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_starts) * max_nodes_per_graph : 0;          // alignment_details_d_->band_starts
+        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_widths) * max_nodes_per_graph : 0;          // alignment_details_d_->band_widths
+        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_head_indices) * max_nodes_per_graph : 0;    // alignment_details_d_->band_head_indices
+        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_max_indices) * max_nodes_per_graph : 0;     // alignment_details_d_->band_max_indices
         device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::traceback_height) * 2 * max_nodes_per_graph : 0; // alignment_details_d->traceback_height
         device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::traceback_width) * 2 * max_nodes_per_graph : 0;  // alignment_details_d->traceback_length
 
@@ -483,9 +483,9 @@ protected:
     int64_t offset_h_ = 0;
     int64_t offset_d_ = 0;
 
-    int64_t input_size_           = 0;
-    int64_t output_size_          = 0;
-    int32_t max_graph_dimension_  = 0;
+    int64_t input_size_          = 0;
+    int64_t output_size_         = 0;
+    int32_t max_graph_dimension_ = 0;
     int32_t device_id_;
 
     // Bit field for output type

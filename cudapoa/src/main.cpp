@@ -158,7 +158,7 @@ void process_batch(Batch* batch,
         if (batch_consensus != nullptr)
         {
             batch_consensus->insert(batch_consensus->end(), consensus.begin(), consensus.end());
-            // get band-widths stats
+            /*// get band-widths stats
             if ((parameters.benchmark_mode == 0 || parameters.benchmark_mode == 1) && !parameters.compact)
             {
                 std::vector<int32_t> min_bw;
@@ -168,7 +168,7 @@ void process_batch(Batch* batch,
                 batch_min_bw->insert(batch_min_bw->end(), min_bw.begin(), min_bw.end());
                 batch_max_bw->insert(batch_max_bw->end(), max_bw.begin(), max_bw.end());
                 batch_avg_bw->insert(batch_avg_bw->end(), avg_bw.begin(), avg_bw.end());
-            }
+            }*/
         }
 
         if (parameters.plot_traceback && traceback_x != nullptr && traceback_y != nullptr)
@@ -255,9 +255,10 @@ void run_cudapoa(const ApplicationParameters& parameters,
                  std::vector<int32_t>* abe_plot       = nullptr,
                  std::vector<int32_t>* max_idx_plot   = nullptr)
 {
-    bool benchmark  = (parameters.benchmark_mode > -1) && (consensus != nullptr);
-    bool band_stats = (min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
-    band_stats      = band_stats && !parameters.compact && benchmark && (parameters.benchmark_mode < 2);
+    bool benchmark = (parameters.benchmark_mode > -1) && (consensus != nullptr);
+    // for the modified adaptive banding, we do not fill band_widths array, therefore disable band_stats
+    bool band_stats = false; //(min_band_width != nullptr) && (max_band_width != nullptr) && (avg_band_width != nullptr);
+    //band_stats      = band_stats && !parameters.compact && benchmark && (parameters.benchmark_mode < 2);
     ChronoTimer timer;
     if (benchmark)
     {
@@ -616,7 +617,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             }
         }
 
-        if (parameters.benchmark_mode != 2)
+        if (parameters.benchmark_mode != 2 && !min_bw.empty())
         {
             //print band-width stats
             std::cerr << "-------------------------------------------------------------------------------------------------------------\n";
@@ -750,18 +751,18 @@ int main(int argc, char* argv[])
         ApplicationParameters parameters_b = parameters;
         if (parameters.benchmark_mode == 0)
         {
-            parameters_a.band_mode = BandMode::adaptive_band;  // adaptive-alignment
+            parameters_a.band_mode = BandMode::adaptive_band; // adaptive-alignment
             parameters_b.band_mode = BandMode::static_band;
         }
         if (parameters.benchmark_mode == 1)
         {
-            parameters_a.band_mode = BandMode::adaptive_band;  // adaptive-alignment
-            parameters_b.band_mode = BandMode::full_band; // full-alignment
+            parameters_a.band_mode = BandMode::adaptive_band; // adaptive-alignment
+            parameters_b.band_mode = BandMode::full_band;     // full-alignment
         }
         if (parameters.benchmark_mode == 2)
         {
             parameters_a.band_mode = BandMode::static_band; // banded-alignment
-            parameters_b.band_mode = BandMode::full_band; // full-alignment
+            parameters_b.band_mode = BandMode::full_band;   // full-alignment
         }
 
         if (parameters.plot_traceback)

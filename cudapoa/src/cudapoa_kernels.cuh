@@ -114,8 +114,7 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                   bool adaptive_banded       = false,
                                   bool banded_alignment      = false,
                                   bool msa                   = false,
-                                  uint32_t static_band_width = 256,
-                                  BandMode band_mode         = BandMode::full_band)
+                                  uint32_t static_band_width = 256)
 {
     // shared error indicator within a warp
     bool warp_error = false;

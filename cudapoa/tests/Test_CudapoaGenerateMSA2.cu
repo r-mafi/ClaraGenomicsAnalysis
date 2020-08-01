@@ -42,13 +42,13 @@ public:
     void SetUp() {}
 
     void initialize(const BatchConfig& batch_size,
-                    uint32_t device_id      = 0,
-                    cudaStream_t stream     = 0,
-                    int8_t output_mask      = OutputType::msa,
-                    int16_t gap_score       = -8,
-                    int16_t mismatch_score  = -6,
-                    int16_t match_score     = 8,
-                    bool banded_alignment   = false,
+                    uint32_t device_id     = 0,
+                    cudaStream_t stream    = 0,
+                    int8_t output_mask     = OutputType::msa,
+                    int16_t gap_score      = -8,
+                    int16_t mismatch_score = -6,
+                    int16_t match_score    = 8,
+                    bool banded_alignment  = false,
                     bool adaptive_banded   = false)
     {
         size_t total = 0, free = 0;
