@@ -431,7 +431,7 @@ public:
             int32_t bw     = 0;
             int32_t offset = poa * batch_size_.max_nodes_per_graph;
 
-            int32_t min_width = batch_size_.max_matrix_sequence_dimension;
+            int32_t min_width = batch_size_.matrix_sequence_dimension;
             int32_t max_width = 0;
             int32_t sum_width = 0;
             int32_t num_rows  = 0;
