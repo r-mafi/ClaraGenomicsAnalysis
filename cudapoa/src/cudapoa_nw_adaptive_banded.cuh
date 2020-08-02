@@ -225,6 +225,8 @@ __device__
                                      SizeT* alignment_read,
                                      SizeT* traceback_widths,
                                      SizeT* traceback_heights,
+                                     SizeT* band_starts,
+                                     SizeT* band_widths,
                                      bool collect_traceback,
                                      SizeT static_band_width,
                                      ScoreT gap_score,
@@ -431,11 +433,21 @@ __device__
     SizeT aligned_nodes = 0;
     if (lane_idx == 0)
     {
-//        if (collect_traceback)
-//        {
-//            // mark end of band-width array
-//            band_widths[graph_count + 1] = -1;
-//        }
+        if (collect_traceback)
+        {
+            // for benchmark-debug tool
+            if (collect_traceback)
+            {
+                for (SizeT graph_pos = 0; graph_pos <= graph_count; graph_pos++)
+                {
+                    band_start             = get_band_start_for_row_adaptive(graph_pos, gradient, band_width, band_shift, max_column);
+                    band_starts[graph_pos] = band_start;
+                    band_widths[graph_pos] = band_width;
+                }
+            }
+            // mark end of band-width array
+            band_widths[graph_count + 1] = -1;
+        }
 
         // Find location of the maximum score in the matrix.
         SizeT i       = 0;

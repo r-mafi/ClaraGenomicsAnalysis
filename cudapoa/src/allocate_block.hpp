@@ -217,12 +217,12 @@ public:
             offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->traceback_width) * 2 * max_graph_dimension_ * max_poas_);
             alignment_details_d->traceback_height = reinterpret_cast<decltype(alignment_details_d->traceback_height)>(&block_data_d_[offset_d_]);
             offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->traceback_height) * 2 * max_graph_dimension_ * max_poas_);
-//            alignment_details_d->band_max_indices = reinterpret_cast<decltype(alignment_details_d->band_max_indices)>(&block_data_d_[offset_d_]);
-//            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_max_indices) * max_graph_dimension_ * max_poas_);
-//            alignment_details_d->band_starts = reinterpret_cast<decltype(alignment_details_d->band_starts)>(&block_data_d_[offset_d_]);
-//            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_starts) * max_graph_dimension_ * max_poas_);
-//            alignment_details_d->band_widths = reinterpret_cast<decltype(alignment_details_d->band_widths)>(&block_data_d_[offset_d_]);
-//            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_widths) * max_graph_dimension_ * max_poas_);
+            //            alignment_details_d->band_max_indices = reinterpret_cast<decltype(alignment_details_d->band_max_indices)>(&block_data_d_[offset_d_]);
+            //            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_max_indices) * max_graph_dimension_ * max_poas_);
+            alignment_details_d->band_starts = reinterpret_cast<decltype(alignment_details_d->band_starts)>(&block_data_d_[offset_d_]);
+            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_starts) * max_graph_dimension_ * max_poas_);
+            alignment_details_d->band_widths = reinterpret_cast<decltype(alignment_details_d->band_widths)>(&block_data_d_[offset_d_]);
+            offset_d_ += cudautils::align<int64_t, 8>(sizeof(*alignment_details_d->band_widths) * max_graph_dimension_ * max_poas_);
         }
 
         // rest of the available memory is assigned to scores buffer
@@ -364,8 +364,8 @@ public:
         // for alignment - device
         device_size_per_poa += sizeof(*AlignmentDetails<ScoreT, SizeT>::alignment_graph) * max_nodes_per_graph;                           // alignment_details_d_->alignment_graph
         device_size_per_poa += sizeof(*AlignmentDetails<ScoreT, SizeT>::alignment_read) * max_nodes_per_graph;                            // alignment_details_d_->alignment_read
-        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_starts) * max_nodes_per_graph : 0;          // alignment_details_d_->band_starts
-        device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_widths) * max_nodes_per_graph : 0;          // alignment_details_d_->band_widths
+        device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_starts) * max_nodes_per_graph : 0;          // alignment_details_d_->band_starts
+        device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_widths) * max_nodes_per_graph : 0;          // alignment_details_d_->band_widths
         device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_head_indices) * max_nodes_per_graph : 0;    // alignment_details_d_->band_head_indices
         device_size_per_poa += variable_bands ? sizeof(*AlignmentDetails<ScoreT, SizeT>::band_max_indices) * max_nodes_per_graph : 0;     // alignment_details_d_->band_max_indices
         device_size_per_poa += plot_traceback ? sizeof(*AlignmentDetails<ScoreT, SizeT>::traceback_height) * 2 * max_nodes_per_graph : 0; // alignment_details_d->traceback_height

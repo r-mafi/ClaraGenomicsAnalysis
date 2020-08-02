@@ -110,6 +110,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                   bool plot_traceback,
                                   SizeT* traceback_width_d,
                                   SizeT* traceback_height_d,
+                                  SizeT* band_starts_d,
+                                  SizeT* band_widths_d,
                                   int32_t TPB                = 64,
                                   bool adaptive_banded       = false,
                                   bool banded_alignment      = false,
@@ -162,6 +164,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
     uint16_t* node_coverage_counts = &node_coverage_counts_d_[max_nodes_per_graph * window_idx];
     SizeT* traceback_width         = &traceback_width_d[2 * max_nodes_per_graph * window_idx];
     SizeT* traceback_height        = &traceback_height_d[2 * max_nodes_per_graph * window_idx];
+    SizeT* band_starts             = &band_starts_d[max_nodes_per_graph * window_idx];
+    SizeT* band_widths             = &band_widths_d[max_nodes_per_graph * window_idx];
 
 #ifdef SPOA_ACCURATE
     uint8_t* node_marks       = &node_marks_d_[max_nodes_per_graph * window_idx];
@@ -280,6 +284,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                                                                             alignment_read,
                                                                                             traceback_width,
                                                                                             traceback_height,
+                                                                                            band_starts,
+                                                                                            band_widths,
                                                                                             collect_traceback,
                                                                                             static_band_width,
                                                                                             gap_score,
@@ -307,6 +313,8 @@ __global__ void generatePOAKernel(uint8_t* consensus_d,
                                                                                                 alignment_read,
                                                                                                 traceback_width,
                                                                                                 traceback_height,
+                                                                                                band_starts,
+                                                                                                band_widths,
                                                                                                 collect_traceback,
                                                                                                 static_band_width,
                                                                                                 gap_score,
@@ -489,6 +497,8 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
     SizeT* alignment_read   = alignment_details_d->alignment_read;
     SizeT* traceback_width  = alignment_details_d->traceback_width;
     SizeT* traceback_height = alignment_details_d->traceback_height;
+    SizeT* band_starts      = alignment_details_d->band_starts;
+    SizeT* band_widths      = alignment_details_d->band_widths;
 
     // unpack graph details
     uint8_t* nodes                          = graph_details_d->nodes;
@@ -565,6 +575,8 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                       traceback_flag,
                                       traceback_width,
                                       traceback_height,
+                                      band_starts,
+                                      band_widths,
                                       TPB,
                                       adaptive_banded,
                                       banded_alignment,
