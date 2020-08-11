@@ -57,6 +57,7 @@ public:
     int32_t single_window  = -1;
     int32_t max_reads      = -1;
     bool bonito_long       = false;
+    float adaptive_storage = 2.0f;
 
 private:
     /// \brief verifies input file formats

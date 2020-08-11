@@ -59,7 +59,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"single-window", required_argument, 0, 'D'},
         {"max-reads", required_argument, 0, 'N'}};
 
-    std::string optstring = "i:ab:w:pd:M:R:m:n:g:vhLB:COPQ:D:N:";
+    std::string optstring = "i:ab:w:pd:M:R:m:n:g:vhB:COPQ:D:N:LS:";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -121,6 +121,9 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'L':
             bonito_long = true;
+            break;
+        case 'S':
+            adaptive_storage = std::stof(optarg);
             break;
         case 'v':
             print_version();
