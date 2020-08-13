@@ -291,7 +291,7 @@ int main(int argc, char** argv)
                 {
                     if (s == StatusType::exceeded_maximum_sequence_size)
                     {
-                        std::cerr << "Dropping sequence because sequence exceeded maximum size" << std::endl;
+                        std::cerr << "Dropping sequence in POA group " << batch_group_ids[i] << " because it exceeded maximum size" << std::endl;
                     }
                 }
                 i++;

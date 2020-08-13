@@ -296,7 +296,7 @@ void ApplicationParameters::help(int32_t exit_code)
             factor to accommodate extra memory for adaptive score matrix. The factor represents ratio of adaptive-banded score matrix to static-banded score matrix [2.0])"
               << R"(
         -F, --filter-outliers
-             filters out reads with large length deviation from the rest of reads lengths in a POA group [disabled])"
+             sorts reads in a POA group and filters out those with large length deviation from the rest of the group [disabled])"
               << R"(
         -S, --sort-reads  <float>
              sorts reads in a POA group based on their lengths [disabled])"

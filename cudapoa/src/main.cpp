@@ -399,7 +399,7 @@ void run_cudapoa(const ApplicationParameters& parameters,
                 {
                     if (s == StatusType::exceeded_maximum_sequence_size)
                     {
-                        std::cerr << "Dropping sequence because sequence exceeded maximum size" << std::endl;
+                        std::cerr << "Dropping sequence in POA group " << batch_group_ids[i] << " because it exceeded maximum size" << std::endl;
                     }
                 }
                 i++;
@@ -709,6 +709,7 @@ int main(int argc, char* argv[])
 
     if (parameters.sort_reads || parameters.filter_outliers)
     {
+        int32_t group_id = 0;
         for (auto& g : poa_groups)
         {
             std::sort(g.begin(), g.end(), [](const Entry& s1, const Entry s2) -> bool { return s1.length > s2.length; });
@@ -717,6 +718,7 @@ int main(int argc, char* argv[])
                 // use simple 1.5xIQR rule to find and filter out outlier data
                 int32_t q1_length = 0, q3_length = 0;
                 int32_t group_size = get_size(g);
+                int32_t num_erased = 0;
                 if (group_size > 0)
                 {
                     q1_length = g[group_size / 4].length;
@@ -730,13 +732,19 @@ int main(int argc, char* argv[])
                     if (it->length < min_length || it->length > max_length)
                     {
                         it = g.erase(it);
+                        num_erased++;
                     }
                     else
                     {
                         it++;
                     }
                 }
+                if (num_erased > 0)
+                {
+                    std::cerr << "Removed " << num_erased << " sequence(s) in POA group " << group_id << " as outliers." << std::endl;
+                }
             }
+            group_id++;
         }
     }
 
