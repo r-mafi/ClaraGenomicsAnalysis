@@ -283,7 +283,7 @@ void ApplicationParameters::help(int32_t exit_code)
             max number of sequences per POA group (must be positive and less than number of reads)[process all])"
               << R"(
         -F, --filter-outliers
-             filters out reads with large length deviation from the rest of reads lengths in a POA group [disabled])"
+             sorts reads in a POA group and filters out those with large length deviation from the rest of the group [disabled])"
               << R"(
         -T, --sort-reads  <float>
              sorts reads in a POA group based on their lengths [disabled])"
