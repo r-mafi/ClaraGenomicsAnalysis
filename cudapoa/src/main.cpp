@@ -707,6 +707,14 @@ int main(int argc, char* argv[])
         }
     }
 
+    if (parameters.sort_reads)
+    {
+        for (auto& g : poa_groups)
+        {
+            std::sort(g.begin(), g.end(), [](const Entry& s1, const Entry s2) -> bool { return s1.length > s2.length; });
+        }
+    }
+
     // for benchmarking
     float time_a = 0.f;
     float time_b = 0.f;
