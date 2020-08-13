@@ -395,13 +395,20 @@ void run_cudapoa(const ApplicationParameters& parameters,
             if (status == StatusType::success)
             {
                 // Check if all sequences in POA group wre added successfully.
+                int32_t num_dropped_seq = 0;
                 for (const auto& s : seq_status)
                 {
                     if (s == StatusType::exceeded_maximum_sequence_size)
                     {
-                        std::cerr << "Dropping sequence in POA group " << batch_group_ids[i] << " because it exceeded maximum size" << std::endl;
+                        num_dropped_seq++;
                     }
                 }
+
+                if (num_dropped_seq > 0)
+                {
+                    std::cerr << "Dropping " << num_dropped_seq << " sequence(s) in POA group " << batch_group_ids[i] << " because it exceeded maximum size" << std::endl;
+                }
+
                 i++;
             }
 
@@ -712,6 +719,7 @@ int main(int argc, char* argv[])
         int32_t group_id = 0;
         for (auto& g : poa_groups)
         {
+            // sort from larger to smaller read-lengths
             std::sort(g.begin(), g.end(), [](const Entry& s1, const Entry s2) -> bool { return s1.length > s2.length; });
             if (parameters.filter_outliers)
             {
