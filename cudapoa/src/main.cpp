@@ -707,11 +707,36 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (parameters.sort_reads)
+    if (parameters.sort_reads || parameters.filter_outliers)
     {
         for (auto& g : poa_groups)
         {
             std::sort(g.begin(), g.end(), [](const Entry& s1, const Entry s2) -> bool { return s1.length > s2.length; });
+            if (parameters.filter_outliers)
+            {
+                // use simple 1.5xIQR rule to find and filter out outlier data
+                int32_t q1_length = 0, q3_length = 0;
+                int32_t group_size = get_size(g);
+                if (group_size > 0)
+                {
+                    q1_length = g[group_size / 4].length;
+                    q3_length = g[3 * group_size / 4].length;
+                }
+                int32_t interq_range_scaled = static_cast<int32_t>(1.5f * (q1_length - q3_length));
+                int32_t min_length          = q3_length - interq_range_scaled;
+                int32_t max_length          = q1_length + interq_range_scaled;
+                for (auto it = g.begin(); it != g.end();)
+                {
+                    if (it->length < min_length || it->length > max_length)
+                    {
+                        it = g.erase(it);
+                    }
+                    else
+                    {
+                        it++;
+                    }
+                }
+            }
         }
     }
 
