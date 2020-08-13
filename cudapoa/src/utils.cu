@@ -91,11 +91,19 @@ void get_multi_batch_sizes(std::vector<BatchConfig>& list_of_batch_sizes,
             {
                 bins_frequency[j]++;
                 bins_group_list[j].push_back(i);
-                int32_t largest_group = bins_max_length[j] * bins_num_reads[j];
-                if (largest_group < current_group)
+                if (band_mode == BandMode::full_band)
                 {
-                    bins_max_length[j] = max_lengths[i];
-                    bins_num_reads[j]  = poa_groups[i].size();
+                    int32_t largest_group = bins_max_length[j] * bins_num_reads[j];
+                    if (largest_group < current_group)
+                    {
+                        bins_max_length[j] = max_lengths[i];
+                        bins_num_reads[j]  = get_size<int32_t>(poa_groups[i]);
+                    }
+                }
+                else
+                {
+                    bins_max_length[j] = max(bins_max_length[j], max_lengths[i]);
+                    bins_num_reads[j]  = max(bins_num_reads[j], get_size<int32_t>(poa_groups[i]));
                 }
                 break;
             }
