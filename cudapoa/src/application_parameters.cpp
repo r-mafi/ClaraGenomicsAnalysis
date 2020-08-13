@@ -80,6 +80,7 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             break;
         case 'p':
             print_output = true;
+            break;
         case 'w':
             band_width = std::stoi(optarg);
             break;
