@@ -57,9 +57,12 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"plot-traceback", no_argument, 0, 'P'},
         {"plot-options", required_argument, 0, 'Q'},
         {"single-window", required_argument, 0, 'D'},
-        {"max-reads", required_argument, 0, 'N'}};
+        {"max-reads", required_argument, 0, 'N'},
+        {"adaptive-storage", required_argument, 0, 'A'},
+        {"filter-outliers", no_argument, 0, 'F'},
+        {"sort-reads", no_argument, 0, 'S'}};
 
-    std::string optstring = "i:ab:w:pd:M:R:m:n:g:vhB:COPQ:D:N:LS:";
+    std::string optstring = "i:ab:w:pd:M:R:m:n:g:vhB:COPQ:D:N:L:A:FS";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -122,8 +125,14 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         case 'L':
             bonito_long = true;
             break;
-        case 'S':
+        case 'A':
             adaptive_storage = std::stof(optarg);
+            break;
+        case 'F':
+            filter_outliers = true;
+            break;
+        case 'S':
+            sort_reads = true;
             break;
         case 'v':
             print_version();
@@ -282,6 +291,15 @@ void ApplicationParameters::help(int32_t exit_code)
               << R"(
         -N, --max-reads  <int>
             max number of sequences per POA group (must be positive and less than number of reads)[process all])"
+              << R"(
+        -A, --adaptive-storage  <float>
+            factor to accommodate extra memory for adaptive score matrix. The factor represents ratio of adaptive-banded score matrix to static-banded score matrix [2.0])"
+              << R"(
+        -F, --filter-outliers
+             filters out reads with large length deviation from the rest of reads lengths in a POA group [disabled])"
+              << R"(
+        -S, --sort-reads  <float>
+             sorts reads in a POA group based on their lengths [disabled])"
               << R"(
         -L, --bonito-long
             set processing mode to bonito-long-read mode. output in fasta format)"
