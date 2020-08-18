@@ -684,11 +684,12 @@ int main(int argc, char* argv[])
         int max_num_reads = get_size(windows[i]);
         if (parameters.max_reads > 0)
         {
-            max_num_reads = std::min(max_num_reads, parameters.max_reads);
+            max_num_reads = parameters.max_reads;
         }
         // Create a new entry for each sequence and add to the group.
-        for (int s = 0; s < max_num_reads; s++)
+        for (int j = 0; j < max_num_reads; j++)
         {
+            int s = j %  get_size(windows[i]);
             const auto& seq = windows[i][s];
             Entry poa_entry{};
             poa_entry.seq     = seq.c_str();
