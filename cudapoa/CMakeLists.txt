@@ -42,6 +42,7 @@ set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++14")
 if(gw_cuda_after_10_0)
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --expt-relaxed-constexpr")
 endif()
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -maxrregcount=72")
 message(STATUS "nvcc flags for ${PROJECT_NAME}: ${CUDA_NVCC_FLAGS}")
 
 get_property(gw_library_type GLOBAL PROPERTY gw_library_type)
