@@ -367,22 +367,18 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
     int32_t number_of_groups = get_size<int32_t>(poa_groups);
     bool verbose             = !parameters.compact;
 
+    // 0 : full, 1: static, 2: adaptive, 3: static-traceback (s-traceback)
+    //=============================================================================================================
+    // 00 --------------------, 01 full       <-> static, 02 full      <-> adaptive , 03 full     <-> s-traceback
+    // 10 static <-> full     , 11 -------------------- , 12 static    <-> adaptive , 13 static   <-> s-traceback
+    // 20 adaptive <-> full   , 21 adaptive   <-> static, ------------------------- , 23 adaptive <-> s-traceback
+    // 30 s-traceback <-> full, 31 straceback <-> static, 32 straceback <-> adaptive, 33 ------------------------
+
     std::string method_a, method_b;
-    if (parameters.benchmark_mode == 0)
-    {
-        method_a = "adaptive ";
-        method_b = "banded   ";
-    }
-    else if (parameters.benchmark_mode == 1)
-    {
-        method_a = "adaptive ";
-        method_b = "full     ";
-    }
-    else if (parameters.benchmark_mode == 1)
-    {
-        method_a = "banded   ";
-        method_b = "full     ";
-    }
+    int a    = parameters.benchmark_mode / 10;
+    int b    = parameters.benchmark_mode % 10;
+    method_a = a == 0 ? "full      " : a == 1 ? "static    " : a == 2 ? "adaptive  " : "traceback ";
+    method_b = b == 0 ? "full      " : b == 1 ? "static    " : b == 2 ? "adaptive  " : "traceback ";
 
     std::cerr << "\nbenchmark summary: ";
     std::cerr << method_a << " alignment vs " << method_b << "alignment\n";
@@ -497,23 +493,23 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
                     float identity_percentage = 100.0f * (float)(identity_cntr) / (float)(std::min(consensus_lengths_b[g], consensus_lengths_a[g]));
 
                     std::cerr << "indels  " << std::left << std::setw(4) << insert_cntr << "/" << std::left << std::setw(13) << delete_cntr;
-                    std::cerr << "mismatches " << std::left << std::setw(13) << mismatch_cntr;
-                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << "% identity " << std::endl;
+                    std::cerr << " mismatches " << std::left << std::setw(13) << mismatch_cntr;
+                    std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << identity_percentage << " % identity " << std::endl;
                 }
                 else
                 {
                     std::cerr << "indels  " << std::left << std::setw(18) << "--------";
-                    std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                    std::cerr << " mismatches " << std::left << std::setw(13) << "---";
                     std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
-                              << "% identity " << std::endl;
+                              << " % identity " << std::endl;
                 }
             }
             else
             {
                 std::cerr << "indels  " << std::left << std::setw(18) << "--------";
-                std::cerr << "mismatches " << std::left << std::setw(13) << "---";
+                std::cerr << " mismatches " << std::left << std::setw(13) << "---";
                 std::cerr << std::left << std::setw(3) << std::fixed << std::setprecision(0) << "NA"
-                          << "% identity " << std::endl;
+                          << " % identity " << std::endl;
             }
         }
     }
@@ -592,25 +588,22 @@ int main(int argc, char* argv[])
     {
         ApplicationParameters parameters_a = parameters;
         ApplicationParameters parameters_b = parameters;
-        if (parameters.benchmark_mode == 0)
+
+        // 0 : full, 1: static, 2: adaptive, 3: static-traceback (s-traceback)
+        //=============================================================================================================
+        int a = parameters.benchmark_mode / 10;
+        int b = parameters.benchmark_mode % 10;
+        if (a == b || a > 4 || b > 4)
         {
-            parameters_a.adaptive = true;  // adaptive-alignment
-            parameters_b.adaptive = false; // banded-alignment
-            parameters_b.banded   = true;
+            std::cerr << "for benchmark (opetion -B), two different methods should be compared against each other.\n";
+            std::cerr << "00       invalid       , 01    full <-> static   , 02     full <-> adaptive  , 03    full <-> s-traceback  \n";
+            std::cerr << "10   static <-> full   , 11        invalid       , 12   static <-> adaptive  , 13  static <-> s-traceback  \n";
+            std::cerr << "20  adaptive <-> full  , 21  adaptive <-> static ,          invalid          , 23 adaptive <-> s-traceback \n";
+            std::cerr << "30 s-traceback <-> full, 31 straceback <-> static, 32 straceback <-> adaptive, 33          invalid         \n";
+            return -1;
         }
-        if (parameters.benchmark_mode == 1)
-        {
-            parameters_a.adaptive = true;  // adaptive-alignment
-            parameters_b.adaptive = false; // full-alignment
-            parameters_b.banded   = false;
-        }
-        if (parameters.benchmark_mode == 2)
-        {
-            parameters_a.adaptive = false; // banded-alignment
-            parameters_a.banded   = true;
-            parameters_b.adaptive = false; // full-alignment
-            parameters_b.banded   = false;
-        }
+        parameters_a.band_mode = a == 0 ? full_band : a == 1 ? static_band : a == 2 ? adaptive_band : static_band_traceback;
+        parameters_b.band_mode = b == 0 ? full_band : b == 1 ? static_band : b == 2 ? adaptive_band : static_band_traceback;
 
         run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a);
         run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
