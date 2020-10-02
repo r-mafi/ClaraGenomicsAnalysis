@@ -57,6 +57,8 @@ public:
     int32_t benchmark_mode = -1;
     int32_t single_window  = -1;
     int32_t max_reads      = -1;
+    bool filter_outliers   = false;
+    bool sort_reads        = false;
 
 private:
     /// \brief verifies input file formats

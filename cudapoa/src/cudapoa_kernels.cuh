@@ -139,7 +139,6 @@ __launch_bounds__(MAX_THREADS_PER_BLOCK_64)
     int32_t scores_width = window_details_d[window_idx].scores_width;
 
     ScoreT* scores;
-    TraceT* traceback = traceback_d;
     float banded_buffer_size; // using float instead of int64_t to minimize register
     if (BM == BandMode::adaptive_band || BM == BandMode::static_band)
     {
