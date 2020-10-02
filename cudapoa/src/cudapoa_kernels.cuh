@@ -874,7 +874,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                               batch_size.max_consensus_size,
                                               TPB,
                                               batch_size.alignment_band_width,
-                                              batch_size.max_pred_distance_in_banded_mode);
+                                              batch_size.max_banded_pred_distance);
         }
         else if (batch_size.band_mode == BandMode::adaptive_band)
         {
@@ -915,7 +915,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                               batch_size.max_consensus_size,
                                               TPB,
                                               batch_size.alignment_band_width,
-                                              batch_size.max_pred_distance_in_banded_mode);
+                                              batch_size.max_banded_pred_distance);
         }
         else if (batch_size.band_mode == BandMode::static_band_traceback)
         {
@@ -998,7 +998,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                               batch_size.max_consensus_size,
                                               TPB,
                                               batch_size.alignment_band_width,
-                                              batch_size.max_pred_distance_in_banded_mode,
+                                              batch_size.max_banded_pred_distance,
                                               traceback);
         }
         else
@@ -1082,7 +1082,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                               batch_size.max_consensus_size,
                                               TPB,
                                               batch_size.alignment_band_width,
-                                              batch_size.max_pred_distance_in_banded_mode);
+                                              batch_size.max_banded_pred_distance);
         }
         else if (batch_size.band_mode == BandMode::adaptive_band)
         {
@@ -1123,7 +1123,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                               batch_size.max_consensus_size,
                                               TPB,
                                               batch_size.alignment_band_width,
-                                              batch_size.max_pred_distance_in_banded_mode);
+                                              batch_size.max_banded_pred_distance);
         }
         else if (batch_size.band_mode == BandMode::static_band_traceback)
         {
@@ -1206,7 +1206,7 @@ void generatePOA(genomeworks::cudapoa::OutputDetails* output_details_d,
                                               batch_size.max_consensus_size,
                                               TPB,
                                               batch_size.alignment_band_width,
-                                              batch_size.max_pred_distance_in_banded_mode,
+                                              batch_size.max_banded_pred_distance,
                                               traceback);
         }
         else
