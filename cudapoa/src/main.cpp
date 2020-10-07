@@ -442,7 +442,7 @@ void print_benchmark_report(const ApplicationParameters& parameters, const std::
             }
             min_seq_length[i] = min_sz;
             max_seq_length[i] = max_sz;
-            avg_seq_length[i] = avg_sz = avg_sz/get_size<int>(group);
+            avg_seq_length[i] = avg_sz = avg_sz / get_size<int>(group);
 
             std::cerr << "G " << std::left << std::setw(3) << i << " (" << std::left << std::setw(6) << min_sz << ", ";
             std::cerr << std::left << std::setw(6) << max_sz << ", " << std::left << std::setw(6) << avg_sz << std::left << std::setw(5) << ")";
@@ -591,8 +591,8 @@ int main(int argc, char* argv[])
                 {
                     median_length = g[group_size / 2].length;
                 }
-                int32_t min_length = median_length / 2;
-                int32_t max_length = (median_length * 3) / 2;
+                int32_t min_length = median_length * (1.0f - parameters.filter_tolerance);
+                int32_t max_length = median_length * (1.0f + parameters.filter_tolerance);
                 for (auto it = g.begin(); it != g.end();)
                 {
                     if (it->length < min_length || it->length > max_length)
@@ -629,7 +629,6 @@ int main(int argc, char* argv[])
         }
         return 0;
     }
-
 
     // for benchmarking
     float time_a = 0.f;

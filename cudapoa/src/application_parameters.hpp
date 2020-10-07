@@ -60,6 +60,7 @@ public:
     int32_t max_reads      = -1;
     bool filter_outliers   = false;
     bool sort_reads        = false;
+    float filter_tolerance = 0.5f;
 
 private:
     /// \brief verifies input file formats

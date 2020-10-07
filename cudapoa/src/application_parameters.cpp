@@ -57,10 +57,10 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
         {"output-fasta", no_argument, 0, 'O'},
         {"single-window", required_argument, 0, 'S'},
         {"max-reads", required_argument, 0, 'N'},
-        {"filter-outliers", no_argument, 0, 'F'},
+        {"filter-outliers", required_argument, 0, 'F'},
         {"sort-reads", no_argument, 0, 'T'}};
 
-    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:vhB:COS:N:FTp";
+    std::string optstring = "i:ab:w:s:l:D:d:M:R:m:n:g:vhB:COS:N:F:Tp";
 
     int32_t argument = 0;
     while ((argument = getopt_long(argc, argv, optstring.c_str(), options, nullptr)) != -1)
@@ -130,7 +130,8 @@ ApplicationParameters::ApplicationParameters(int argc, char* argv[])
             max_reads = std::stoi(optarg);
             break;
         case 'F':
-            filter_outliers = true;
+            filter_outliers  = true;
+            filter_tolerance = std::stof(optarg);
             break;
         case 'T':
             sort_reads = true;
@@ -286,8 +287,8 @@ void ApplicationParameters::help(int32_t exit_code)
         -N, --max-reads  <int>
             max number of sequences per POA group (must be positive and less than number of reads)[process all])"
               << R"(
-        -F, --filter-outliers
-             sorts reads in a POA group and filters out those with large length deviation from the rest of the group [disabled])"
+        -F, --filter-outliers <float> [0.1 , 0.9]
+             sorts reads in a POA group and filters out those with length deviation (defined as input, between 0.1 to 0.9) from the median length in the group [disabled])"
               << R"(
         -T, --sort-reads  <float>
              sorts reads in a POA group based on their lengths [disabled])"
