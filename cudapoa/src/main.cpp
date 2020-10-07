@@ -565,6 +565,7 @@ int main(int argc, char* argv[])
     {
         Group& group = poa_groups[i];
         // Create a new entry for each sequence and add to the group.
+        int32_t num_reads = 0;
         for (const auto& seq : windows[i])
         {
             Entry poa_entry{};
@@ -572,6 +573,11 @@ int main(int argc, char* argv[])
             poa_entry.length  = seq.length();
             poa_entry.weights = nullptr;
             group.push_back(poa_entry);
+            num_reads++;
+            if (num_reads == parameters.max_reads)
+            {
+                break;
+            }
         }
     }
 
