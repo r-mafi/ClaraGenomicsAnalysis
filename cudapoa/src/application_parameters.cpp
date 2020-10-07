@@ -280,7 +280,7 @@ void ApplicationParameters::help(int32_t exit_code)
         -O, --output-fasta
             output reads in fasta format and exits the application [disabled])"
               << R"(
-        -D, --single-window  <int>
+        -S, --single-window  <int>
             selects a single POA group instead of all input groups (must be positive and within the range of number of groups) [process all])"
               << R"(
         -N, --max-reads  <int>
