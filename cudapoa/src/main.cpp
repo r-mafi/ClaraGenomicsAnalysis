@@ -664,8 +664,8 @@ int main(int argc, char* argv[])
             std::cerr << "30 s-traceback <-> full, 31 straceback <-> static, 32 straceback <-> adaptive, 33          invalid         \n";
             return -1;
         }
-        parameters_a.band_mode = a == 0 ? full_band : a == 1 ? static_band : a == 2 ? adaptive_band : static_band_traceback;
-        parameters_b.band_mode = b == 0 ? full_band : b == 1 ? static_band : b == 2 ? adaptive_band : static_band_traceback;
+        parameters_a.band_mode = a == 0 ? full_band : a == 1 ? static_band : a == 2 ? adaptive_band : a == 3 ? static_band_traceback : adaptive_band_traceback;
+        parameters_b.band_mode = b == 0 ? full_band : b == 1 ? static_band : b == 2 ? adaptive_band : b == 3 ? static_band_traceback : adaptive_band_traceback;
 
         run_cudapoa(parameters_a, poa_groups, time_a, &consensus_a);
         run_cudapoa(parameters_b, poa_groups, time_b, &consensus_b);
