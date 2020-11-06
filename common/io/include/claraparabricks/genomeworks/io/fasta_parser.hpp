@@ -69,6 +69,14 @@ std::unique_ptr<FastaParser> create_kseq_fasta_parser(const std::string& fasta_f
                                                       number_of_basepairs_t min_sequence_length = 0,
                                                       bool shuffle                              = true);
 
+/// \brief A builder function for FASTA parser wrapper constructor
+///
+/// \param reads raw reads data
+/// \param name prefix used as reads names
+/// \return A unique pointer to a constructed parser object.
+std::unique_ptr<FastaParser> create_fasta_parser_wrapper(const std::vector<std::string>& reads,
+                                                         const std::string& name);
+
 } // namespace io
 
 } // namespace genomeworks
