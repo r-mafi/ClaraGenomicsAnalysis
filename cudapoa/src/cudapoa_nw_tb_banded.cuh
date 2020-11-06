@@ -139,6 +139,7 @@ __device__ __forceinline__ ScoreT get_score_tb(ScoreT* scores,
 
 template <typename SeqT, typename ScoreT, typename TraceT>
 __device__ __forceinline__ void get_scores_tb(ScoreT* scores,
+                                              ScoreT* scores_sh,
                                               int32_t pred_node,
                                               int32_t current_node,
                                               int32_t column,
@@ -175,14 +176,24 @@ __device__ __forceinline__ void get_scores_tb(ScoreT* scores,
     }
     else
     {
-        // row is mapped to [0, score_matrix_height) span
-        ScoreT4<ScoreT>* pred_scores = (ScoreT4<ScoreT>*)get_score_ptr_tb(scores, pred_node % score_matrix_height, column, band_start, band_width);
-
-        // loads 8/16 consecutive bytes (4 ScoreTs)
-        ScoreT4<ScoreT> score4 = pred_scores[0];
-
-        // need to load the next chunk of memory as well
-        ScoreT4<ScoreT> score4_next = pred_scores[1];
+        ScoreT4<ScoreT> score4, score4_next;
+        if (pred_node + 1 == current_node)
+        {
+            score4.s0      = scores_sh[column - band_start];
+            score4.s1      = scores_sh[column - band_start + 1];
+            score4.s2      = scores_sh[column - band_start + 2];
+            score4.s3      = scores_sh[column - band_start + 3];
+            score4_next.s0 = scores_sh[column - band_start + 4];
+        }
+        else
+        {
+            // row is mapped to [0, score_matrix_height) span
+            ScoreT4<ScoreT>* pred_scores = (ScoreT4<ScoreT>*)get_score_ptr_tb(scores, pred_node % score_matrix_height, column, band_start, band_width);
+            // loads 8/16 consecutive bytes (4 ScoreTs)
+            score4 = pred_scores[0];
+            // need to load the next chunk of memory as well
+            score4_next = pred_scores[1];
+        }
 
         int32_t char_profile = (graph_base == read4.r0 ? match_score : mismatch_score);
 
@@ -298,6 +309,9 @@ __device__ __forceinline__
 
     int32_t max_column = read_length + 1;
 
+    // one row buffer for keeping scores of the previous node
+    __shared__ ScoreT scores_sh[2][264+1];
+
     // Set band-width based on scores matrix aspect ratio
     //---------------------------------------------------------
     // band_shift defines distance of band_start from the scores matrix diagonal, ad-hoc rule 4
@@ -336,6 +350,7 @@ __device__ __forceinline__
     for (int32_t j = lane_idx; j < band_width + CUDAPOA_BANDED_MATRIX_RIGHT_PADDING; j += WARP_SIZE)
     {
         set_score_tb(scores, 0, j, score_matrix_height, j * gap_score, 0, band_width);
+        scores_sh[0][j] = j * gap_score;
     }
 
     if (lane_idx == 0)
@@ -366,7 +381,8 @@ __device__ __forceinline__
         {
             // Initialise the vertical boundary of the score matrix
             int32_t penalty;
-            pred_count = incoming_edge_count[node_id];
+            pred_count      = incoming_edge_count[node_id];
+            scores_sh[1][0] = scores_sh[1][band_width] = min_score_value;
             if (pred_count == 0)
             {
                 first_element_prev_score = gap_score;
@@ -374,6 +390,7 @@ __device__ __forceinline__
                 // row is mapped to [0, score_matrix_height) span
                 int64_t index    = static_cast<int64_t>(score_gIdx % score_matrix_height) * static_cast<int64_t>(band_width + CUDAPOA_BANDED_MATRIX_RIGHT_PADDING);
                 scores[index]    = first_element_prev_score;
+                scores_sh[1][0]  = first_element_prev_score;
                 index            = static_cast<int64_t>(score_gIdx) * static_cast<int64_t>(band_width + CUDAPOA_BANDED_MATRIX_RIGHT_PADDING);
                 traceback[index] = first_element_prev_trace;
             }
@@ -415,6 +432,7 @@ __device__ __forceinline__
                         }
                         first_element_prev_score = penalty + gap_score;
                         set_score_tb(scores, score_gIdx, -1, score_matrix_height, first_element_prev_score, band_start, band_width);
+                        scores_sh[1][0]  = first_element_prev_score;
                         traceback[index] = first_element_prev_trace;
                     }
                 }
@@ -440,6 +458,7 @@ __device__ __forceinline__
                     }
                     first_element_prev_score = penalty + gap_score;
                     set_score_tb(scores, score_gIdx, -1, score_matrix_height, first_element_prev_score, band_start, band_width);
+                    scores_sh[1][0]  = first_element_prev_score;
                     traceback[index] = first_element_prev_trace;
                 }
             }
@@ -458,7 +477,7 @@ __device__ __forceinline__
             TraceT4<TraceT> trace;
             ScoreT4<ScoreT> score = {min_score_value, min_score_value, min_score_value, min_score_value};
             // note that whenever accessing a score matrix row, the row needs to be mapped to [0, score_matrix_height)
-            get_scores_tb(scores, pred_idx, score_gIdx, read_pos, score_matrix_height, band_width, band_shift, gradient,
+            get_scores_tb(scores, scores_sh[0], pred_idx, score_gIdx, read_pos, score_matrix_height, band_width, band_shift, gradient,
                           max_column, gap_score, match_score, mismatch_score, read4, graph_base, score, trace);
 
             // Perform same score updates as above, but for rest of predecessors.
@@ -467,7 +486,7 @@ __device__ __forceinline__
                 int32_t pred_idx_tmp = node_id_to_pos[incoming_edges[node_id * CUDAPOA_MAX_NODE_EDGES + p]] + 1;
                 if ((score_gIdx - pred_idx_tmp) < score_matrix_height)
                 {
-                    get_scores_tb(scores, pred_idx_tmp, score_gIdx, read_pos, score_matrix_height, band_width, band_shift, gradient,
+                    get_scores_tb(scores, scores_sh[0], pred_idx_tmp, score_gIdx, read_pos, score_matrix_height, band_width, band_shift, gradient,
                                   max_column, gap_score, match_score, mismatch_score, read4, graph_base, score, trace);
                 }
             }
@@ -520,6 +539,12 @@ __device__ __forceinline__
                 }
             }
 
+            // copy values in single row shared mem cache
+            scores_sh[1][read_pos + 1 - band_start] = score.s0;
+            scores_sh[1][read_pos + 2 - band_start] = score.s1;
+            scores_sh[1][read_pos + 3 - band_start] = score.s2;
+            scores_sh[1][read_pos + 4 - band_start] = score.s3;
+
             // shuffle registers to allow coalesced storing
             ScoreT s3_copy = score.s3;
             score.s3       = score.s2;
@@ -563,6 +588,13 @@ __device__ __forceinline__
 
             __syncwarp();
         }
+
+        // temp : copy shared mem row 1 to 0
+        for (int32_t j = lane_idx; j < band_width; j += WARP_SIZE)
+        {
+            scores_sh[0][j] = scores_sh[1][j];
+        }
+        __syncwarp();
     }
 
     int32_t aligned_nodes = 0;
