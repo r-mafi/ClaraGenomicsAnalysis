@@ -41,6 +41,10 @@ public:
                       number_of_basepairs_t min_sequence_length,
                       bool shuffle);
 
+    /// \brief Constructor used to wrap around std::vector<std::string> data
+    /// \param reads raw reads data
+    FastaParserKseqpp(const std::vector<std::string>& reads, const std::string& name);
+
     /// \brief Return number of sequences in FASTA file
     /// \return Sequence count in file
     number_of_reads_t get_num_seqences() const override;

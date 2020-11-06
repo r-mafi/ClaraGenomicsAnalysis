@@ -41,8 +41,6 @@ FastaParserKseqpp::FastaParserKseqpp(const std::string& fasta_file,
     klibpp::KSeq record;
     klibpp::SeqStreamIn iss(fasta_file.data());
 
-    std::vector<FastaSequence> seqs;
-
     iss >> record;
     if (iss.fail())
     {
@@ -77,6 +75,18 @@ number_of_reads_t FastaParserKseqpp::get_num_seqences() const
 const FastaSequence& FastaParserKseqpp::get_sequence_by_id(const read_id_t sequence_id) const
 {
     return reads_[sequence_id];
+}
+
+// used as a wrapper for std::vector<std::string>
+FastaParserKseqpp::FastaParserKseqpp(const std::vector<std::string>& reads, const std::string& name)
+{
+    size_t num_reads = reads.size();
+    reads_.resize(num_reads);
+    for (size_t i = 0; i < num_reads; i++)
+    {
+        reads_[i].seq  = reads[i];
+        reads_[i].name = name + std::to_string(i);
+    }
 }
 
 } // namespace io

@@ -38,6 +38,12 @@ std::unique_ptr<FastaParser> create_kseq_fasta_parser(const std::string& fasta_f
                                                shuffle);
 }
 
+std::unique_ptr<FastaParser> create_fasta_parser_wrapper(const std::vector<std::string>& reads,
+                                                         const std::string& name)
+{
+    return std::make_unique<FastaParserKseqpp>(reads, name);
+}
+
 } // namespace io
 
 } // namespace genomeworks
